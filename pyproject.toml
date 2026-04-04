@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "optimaintainer"
+version = "1.0.0"
+description = "OpenEnv grading environment for AI repo-maintenance agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "BSD-3-Clause"}
+authors = [
+    {name = "Arnav", email = "arnav@example.com"},
+]
+keywords = ["openenv", "reinforcement-learning", "ai-agents", "grading"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic==2.10.4",
+    "httpx==0.28.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/Arnav112-l/META-x-Scaler-Hackathon-"
+
+[tool.setuptools.packages.find]
+include = ["server*"]

@@ -1,0 +1,319 @@
+{
+  "scenarios": [
+    {
+      "id": "triage-001",
+      "type": "triage",
+      "description": "Memory leak in distributed training after upgrading NCCL",
+      "context": {
+        "title": "OOM crash during DDP training with NCCL 2.18",
+        "body": "After upgrading NCCL from 2.17 to 2.18, our distributed training jobs crash with OOM after ~200 iterations. The leak seems to come from all-reduce buffers not being freed. Reproducible on 8xA100.",
+        "labels": ["module: distributed", "high priority"]
+      },
+      "reference": {
+        "category": "bug",
+        "severity": "high",
+        "assignee": "oncall:distributed",
+        "domain": "oncall:",
+        "decision": "stop"
+      }
+    },
+    {
+      "id": "triage-002",
+      "type": "triage",
+      "description": "Feature request for torch.compile support on custom ops",
+      "context": {
+        "title": "torch.compile fails silently on custom C++ ops registered via torch.library",
+        "body": "When using torch.compile on a model that uses custom ops registered with torch.library, the compiler silently falls back to eager mode. Expected: either compile the custom op or raise a clear error. This affects PT2 adoption significantly.",
+        "labels": ["module: pt2", "feature request"]
+      },
+      "reference": {
+        "category": "feature",
+        "severity": "medium",
+        "assignee": "oncall:pt2",
+        "domain": "oncall:",
+        "decision": "continue"
+      }
+    },
+    {
+      "id": "triage-003",
+      "type": "triage",
+      "description": "Critical data corruption in checkpoint saving",
+      "context": {
+        "title": "torch.save() produces corrupted checkpoints on NFS with >10GB models",
+        "body": "When saving models larger than 10GB to NFS-mounted storage, the checkpoint file is silently corrupted. Loading the checkpoint produces incorrect tensor shapes. This is a data-loss scenario. Affects production training pipelines.",
+        "labels": ["module: serialization", "critical"]
+      },
+      "reference": {
+        "category": "bug",
+        "severity": "critical",
+        "assignee": "oncall:serialization",
+        "domain": "oncall:",
+        "decision": "stop"
+      }
+    },
+    {
+      "id": "triage-004",
+      "type": "triage",
+      "description": "Documentation improvement for autograd API",
+      "context": {
+        "title": "Docs for torch.autograd.Function lack examples for vmap support",
+        "body": "The documentation for custom autograd functions doesn't cover how to make them compatible with vmap/functorch. Several users have asked about this. Adding 2-3 examples would significantly improve the developer experience.",
+        "labels": ["module: docs", "good first issue"]
+      },
+      "reference": {
+        "category": "documentation",
+        "severity": "low",
+        "assignee": "oncall:docs",
+        "domain": "oncall:",
+        "decision": "continue"
+      }
+    },
+    {
+      "id": "triage-005",
+      "type": "triage",
+      "description": "Performance regression in conv2d after recent PR",
+      "context": {
+        "title": "20% slowdown in conv2d on CPU after PR #98765",
+        "body": "After merging PR #98765 (memory layout optimization), conv2d performance regressed by ~20% on CPU for batch_size=1. GPU perf is unaffected. Bisected to commit abc123. This blocks the 2.3 release.",
+        "labels": ["module: performance", "release blocker"]
+      },
+      "reference": {
+        "category": "performance",
+        "severity": "high",
+        "assignee": "oncall:performance",
+        "domain": "oncall:",
+        "decision": "stop"
+      }
+    },
+    {
+      "id": "security-001",
+      "type": "security",
+      "description": "SQL injection in model registry query endpoint",
+      "context": {
+        "file": "model_registry/api/search.py",
+        "code": "def search_models(query: str):\n    cursor = db.execute(f\"SELECT * FROM models WHERE name LIKE '%{query}%'\")\n    return cursor.fetchall()",
+        "language": "python"
+      },
+      "reference": {
+        "vulnerabilities": [
+          {
+            "cwe_id": "CWE-89",
+            "line_number": 2,
+            "severity": "critical",
+            "fix_keywords": ["parameterized", "prepared statement", "bound parameter"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-002",
+      "type": "security",
+      "description": "XSS in model card rendering via markdown",
+      "context": {
+        "file": "hub/templates/model_card.py",
+        "code": "def render_card(card_content: str):\n    html = markdown.markdown(card_content)\n    return f'<div class=\"card\">{html}</div>'",
+        "language": "python"
+      },
+      "reference": {
+        "vulnerabilities": [
+          {
+            "cwe_id": "CWE-79",
+            "line_number": 2,
+            "severity": "high",
+            "fix_keywords": ["sanitize", "escape", "dompurify", "bleach"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-003",
+      "type": "security",
+      "description": "Unsafe deserialization of model weights",
+      "context": {
+        "file": "core/model_loader.py",
+        "code": "import pickle\ndef load_weights(path: str):\n    with open(path, 'rb') as f:\n        return pickle.load(f)\n\ndef validate_config(yaml_str: str):\n    import yaml\n    return yaml.load(yaml_str, Loader=yaml.FullLoader)",
+        "language": "python"
+      },
+      "reference": {
+        "vulnerabilities": [
+          {
+            "cwe_id": "CWE-502",
+            "line_number": 4,
+            "severity": "critical",
+            "fix_keywords": ["safe loader", "safetensors", "json", "allowlist"]
+          },
+          {
+            "cwe_id": "CWE-502",
+            "line_number": 8,
+            "severity": "high",
+            "fix_keywords": ["yaml.safe_load", "safe loader"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-004",
+      "type": "security",
+      "description": "Path traversal in dataset download",
+      "context": {
+        "file": "datasets/download.py",
+        "code": "import os\ndef download_file(base_dir: str, filename: str):\n    path = os.path.join(base_dir, filename)\n    with open(path, 'rb') as f:\n        return f.read()",
+        "language": "python"
+      },
+      "reference": {
+        "vulnerabilities": [
+          {
+            "cwe_id": "CWE-22",
+            "line_number": 3,
+            "severity": "high",
+            "fix_keywords": ["realpath", "canonicalize", "basename", "path traversal"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "security-005",
+      "type": "security",
+      "description": "SSRF in webhook URL for model deployment notifications",
+      "context": {
+        "file": "deploy/notifications.py",
+        "code": "import requests\ndef send_notification(webhook_url: str, message: str):\n    response = requests.post(webhook_url, json={'text': message})\n    return response.status_code",
+        "language": "python"
+      },
+      "reference": {
+        "vulnerabilities": [
+          {
+            "cwe_id": "CWE-918",
+            "line_number": 3,
+            "severity": "high",
+            "fix_keywords": ["allowlist", "url validation", "ssrf", "internal", "deny list"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dependency-001",
+      "type": "dependency",
+      "description": "Upgrade numpy from 1.24.x to 2.0 (major breaking change)",
+      "context": {
+        "package": "numpy",
+        "current_version": "1.24.4",
+        "target_version": "2.0.0",
+        "changelog_summary": "NumPy 2.0 removes deprecated APIs, changes default integer type to int64, removes numpy.distutils, and changes array string representations."
+      },
+      "reference": {
+        "updates": [
+          {
+            "package": "numpy",
+            "from_version": "1.24.4",
+            "to_version": "2.0.0",
+            "is_breaking": true,
+            "migration_keywords": ["deprecated", "int64", "distutils", "string", "repr", "dtype", "api", "removed", "ravel", "ndarray"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dependency-002",
+      "type": "dependency",
+      "description": "Upgrade Pydantic v1 → v2",
+      "context": {
+        "package": "pydantic",
+        "current_version": "1.10.13",
+        "target_version": "2.5.3",
+        "changelog_summary": "Pydantic V2 is a full rewrite using pydantic-core. Major changes: BaseModel.dict() → model_dump(), validator → field_validator, Config class → model_config dict."
+      },
+      "reference": {
+        "updates": [
+          {
+            "package": "pydantic",
+            "from_version": "1.10.13",
+            "to_version": "2.5.3",
+            "is_breaking": true,
+            "migration_keywords": ["model_dump", "field_validator", "model_config", "pydantic_core", "basemodel", "dict", "validator", "rewrite", "v2", "schema"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dependency-003",
+      "type": "dependency",
+      "description": "Upgrade Flask 2.x → 3.0 and Werkzeug",
+      "context": {
+        "package": "flask",
+        "current_version": "2.3.3",
+        "target_version": "3.0.0",
+        "changelog_summary": "Flask 3.0 drops Python 3.7 support, removes deprecated code, requires Werkzeug >= 3.0. Blueprints no longer support the `name` argument — use `import_name`."
+      },
+      "reference": {
+        "updates": [
+          {
+            "package": "flask",
+            "from_version": "2.3.3",
+            "to_version": "3.0.0",
+            "is_breaking": true,
+            "migration_keywords": ["werkzeug", "blueprint", "import_name", "python37", "deprecated", "name", "async", "removed"]
+          },
+          {
+            "package": "werkzeug",
+            "from_version": "2.3.8",
+            "to_version": "3.0.1",
+            "is_breaking": true,
+            "migration_keywords": ["url_map", "routing", "converters", "removed", "deprecated", "security"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dependency-004",
+      "type": "dependency",
+      "description": "Patch update for requests (non-breaking)",
+      "context": {
+        "package": "requests",
+        "current_version": "2.31.0",
+        "target_version": "2.32.3",
+        "changelog_summary": "Requests 2.32.x includes minor bug fixes for session handling and certificate verification. No breaking changes."
+      },
+      "reference": {
+        "updates": [
+          {
+            "package": "requests",
+            "from_version": "2.31.0",
+            "to_version": "2.32.3",
+            "is_breaking": false,
+            "migration_keywords": ["session", "certificate", "bugfix", "patch"]
+          }
+        ]
+      }
+    },
+    {
+      "id": "dependency-005",
+      "type": "dependency",
+      "description": "Upgrade transformers 4.36 → 4.40 with new pipeline breaking changes",
+      "context": {
+        "package": "transformers",
+        "current_version": "4.36.0",
+        "target_version": "4.40.0",
+        "changelog_summary": "Transformers 4.40 changes the default attention implementation, deprecates old pipeline names, requires tokenizers >= 0.19. Some model configs renamed."
+      },
+      "reference": {
+        "updates": [
+          {
+            "package": "transformers",
+            "from_version": "4.36.0",
+            "to_version": "4.40.0",
+            "is_breaking": true,
+            "migration_keywords": ["attention", "pipeline", "tokenizers", "config", "deprecated", "sdpa", "flash", "renamed"]
+          },
+          {
+            "package": "tokenizers",
+            "from_version": "0.15.2",
+            "to_version": "0.19.1",
+            "is_breaking": false,
+            "migration_keywords": ["rust", "performance", "compatible"]
+          }
+        ]
+      }
+    }
+  ]
+}
