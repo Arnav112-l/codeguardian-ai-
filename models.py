@@ -1,128 +1,90 @@
-"""
-OptiMaintainer — Pydantic models for the OpenEnv grading environment.
-
-Defines the core Action (agent → env) and Observation (env → agent) schemas
-used by all three grading tracks: Triage, Security, and Dependency.
-"""
-
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Union
 
-from pydantic import BaseModel, Field, field_validator
-
-
-# ─────────────────────────────────────────────
-#  Enumerations
-# ─────────────────────────────────────────────
-
-class ActionType(str, Enum):
-    TRIAGE = "triage"
-    SECURITY = "security"
-    DEPENDENCY = "dependency"
-
-
-class Severity(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
-
-
-class TriageDecision(str, Enum):
-    STOP = "stop"
-    CONTINUE = "continue"
-
-
-# ─────────────────────────────────────────────
-#  Action payloads (agent → environment)
-# ─────────────────────────────────────────────
-
-class TriageActionPayload(BaseModel):
-    """Payload for issue-triage actions."""
-    category: str = Field(..., description="Predicted issue category (e.g. 'bug', 'feature', 'performance')")
-    severity: Severity = Field(..., description="Predicted severity level")
-    assignee: str = Field(..., description="Oncall or person to route the issue to")
-    decision: TriageDecision = Field(..., description="STOP or CONTINUE escalation")
-
-
-class SecurityFinding(BaseModel):
-    """A single vulnerability finding reported by the agent."""
-    cwe_id: str = Field(..., description="CWE identifier, e.g. 'CWE-89'")
-    line_number: int = Field(..., ge=1, description="Source line where the vuln was found")
-    fix_description: str = Field("", description="Short description of the recommended fix")
-
-
-class SecurityActionPayload(BaseModel):
-    """Payload for security-audit actions."""
-    findings: List[SecurityFinding] = Field(default_factory=list)
-
-
-class DependencyUpdate(BaseModel):
-    """A single dependency update proposed by the agent."""
-    package: str = Field(..., description="Package name, e.g. 'requests'")
-    from_version: str = Field(..., description="Current version string")
-    to_version: str = Field(..., description="Target version string")
-    is_breaking: bool = Field(False, description="Whether the update is breaking")
-    migration_notes: str = Field("", description="Free-text migration instructions")
-
-
-class DependencyActionPayload(BaseModel):
-    """Payload for dependency-updater actions."""
-    updates: List[DependencyUpdate] = Field(default_factory=list)
-
-
-class Action(BaseModel):
-    """
-    Top-level action sent by an AI agent.
-
-    The `action_type` discriminator selects which grader processes the payload.
-    """
-    action_type: ActionType
-    scenario_id: str = Field(..., description="ID of the scenario being answered")
-    payload: Dict[str, Any] = Field(..., description="Action-type-specific payload")
-
-    def parse_triage(self) -> TriageActionPayload:
-        return TriageActionPayload(**self.payload)
-
-    def parse_security(self) -> SecurityActionPayload:
-        return SecurityActionPayload(**self.payload)
-
-    def parse_dependency(self) -> DependencyActionPayload:
-        return DependencyActionPayload(**self.payload)
-
-
-# ─────────────────────────────────────────────
-#  Observation (environment → agent)
-# ─────────────────────────────────────────────
-
-class SubScore(BaseModel):
-    """An individual grading dimension."""
-    name: str
-    score: float = Field(..., ge=0.0, le=1.0)
-    feedback: str = ""
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 
 class Observation(BaseModel):
-    """
-    Response returned to the agent after each /step call.
-    """
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    task_id: str
     scenario_id: str
-    action_type: ActionType
-    total_score: float = Field(..., ge=0.0, le=1.0)
-    sub_scores: List[SubScore] = Field(default_factory=list)
-    feedback: str = Field("", description="Human-readable explanation of the grade")
-    done: bool = Field(False, description="Whether the episode is complete")
+    context: str
+    available_actions: list[str]
+    step_number: int
+    episode_id: str
 
 
-# ─────────────────────────────────────────────
-#  Environment state
-# ─────────────────────────────────────────────
+class TriageAction(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
 
-class EnvState(BaseModel):
-    """Tracks the current episode state across /reset and /step calls."""
-    current_scenario_idx: int = 0
-    completed_scenarios: List[str] = Field(default_factory=list)
-    scores: Dict[str, float] = Field(default_factory=dict)
-    episode_done: bool = False
+    category: Literal["bug", "feature", "docs", "question"]
+    severity: Literal["low", "medium", "high", "critical"]
+    module_label: str
+    oncall_routing: str
+
+
+class Finding(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    cwe_id: str
+    line_number: int
+    severity: str
+    fix_description: str
+
+
+class SecurityAuditAction(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    findings: List[Finding]
+
+
+class DependencyAction(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    updated_version: str
+    breaking_changes: List[str]
+    migration_description: str
+
+
+Action = Union[TriageAction, SecurityAuditAction, DependencyAction]
+ACTION_ADAPTER = TypeAdapter(Action)
+
+
+class Reward(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    total_score: float
+    sub_scores: Dict[str, float]
+    feedback: str
+    is_terminal: bool
+
+
+class State(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    episode_id: str
+    task_id: str
+    step_count: int
+    current_scenario_id: str
+    cumulative_reward: float
+
+
+def parse_action_union(payload: Dict[str, Any]) -> Action:
+    """Validate an action payload through the Action union adapter."""
+    return ACTION_ADAPTER.validate_python(payload)
+
+
+def model_validate_action(payload: Dict[str, Any], task_id: str) -> Action:
+    """Validate payload against the task-specific action model."""
+    model_by_task = {
+        "task_triage": TriageAction,
+        "task_security_audit": SecurityAuditAction,
+        "task_dependency_update": DependencyAction,
+        "task_dependency": DependencyAction,
+    }
+    action_model = model_by_task.get(task_id)
+    if action_model is None:
+        raise ValueError(f"Unknown task_id for action validation: {task_id}")
+    return action_model.model_validate(payload)
