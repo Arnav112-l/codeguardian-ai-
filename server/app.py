@@ -227,8 +227,10 @@ async def list_scenarios():
 
 @app.get("/state")
 async def get_state():
-    """Return the current episode state (for debugging)."""
+    """Return the current episode state (OpenEnv standard: episode_id, step_count)."""
     return {
+        "episode_id": "ep_" + str(id(_state)),
+        "step_count": len(_state.completed_scenarios),
         "completed": _state.completed_scenarios,
         "scores": _state.scores,
         "remaining": len(SCENARIOS) - len(_state.completed_scenarios),
@@ -239,3 +241,4 @@ async def get_state():
             else None
         ),
     }
+
