@@ -1,0 +1,25 @@
+name: "meta-hackathon-coding-env"
+version: "1.0.0"
+description: "LLM coding agent evaluation environment"
+type: coding_env
+runtime: docker
+app_port: 8000
+
+hardware: cpu-basic
+
+observation_type: text
+action_type: structured
+reward_range: [0.0, 1.0]
+
+tasks:
+  - id: task_triage
+    difficulty: easy
+    description: "Triage incoming bug/feature/docs/question tickets"
+  - id: task_security_audit
+    difficulty: medium
+    description: "Identify CWE vulnerabilities in Python code snippets"
+  - id: task_dependency_update
+    difficulty: hard
+    description: "Recommend safe dependency version upgrades with migration plan"
+
+tags: [openenv, coding, security, devtools, pytorch]
