@@ -31,9 +31,9 @@ _FIX_KEYWORDS: Dict[str, List[str]] = {
     "CWE-78": ["allowlist", "whitelist", "subprocess", "shlex", "shell=false", "avoid shell"],
     "CWE-22": ["canonicalize", "realpath", "basename", "path traversal", "chroot"],
     "CWE-502": ["safe loader", "json", "allowlist", "deserialize", "yaml.safe_load", "safetensors"],
-    "CWE-918": ["allowlist", "ssrf", "url validation", "internal", "deny list"],
+    "CWE-918": ["allowlist", "ssrf", "url validation", "internal", "deny list", "ipv4", "local"],
     "CWE-327": ["aes", "sha-256", "bcrypt", "argon2", "modern cipher", "strong hash"],
-    "CWE-798": ["environment variable", "vault", "secret manager", "config", "rotate"],
+    "CWE-798": ["env", "vault", "secret", "environment variable", "vault agent", "secret manager", "rotate"],
     "CWE-611": ["disable external entities", "xxe", "defusedxml", "disallow_doctype"],
     "CWE-434": ["file type", "mime", "magic bytes", "extension whitelist", "content-type"],
 }
@@ -74,13 +74,13 @@ def _match_finding(
 
         # Base score 0.6 for a valid match + 0.4 keyword bonus
         base = 0.6
-        kw_bonus = 0.4 * _keyword_match_score(ref["cwe_id"], agent_finding.fix_description)
+        kw_bonus_check = _keyword_match_score(ref["cwe_id"], agent_finding.fix_description)
+        kw_bonus = 0.4 * kw_bonus_check
         score = base + kw_bonus
 
         feedback = (
-            f"Matched {ref['cwe_id']} at line {ref['line_number']} "
-            f"(agent line {agent_finding.line_number}): "
-            f"base=0.6 + keyword_bonus={kw_bonus:.2f}"
+            f"Vulnerability match ({ref['cwe_id']} @ L{ref['line_number']}): "
+            f"base=0.6, keyword_bonus={kw_bonus:.2f} (keywords: {kw_bonus_check > 0})"
         )
         return idx, score, feedback
 
@@ -100,7 +100,7 @@ def grade(action: Action, reference: Dict[str, Any]) -> Observation:
     feedback_parts: List[str] = []
 
     # --- Score each agent finding ---
-    # False Positive Logic: deduction of 0.05 for setiap finding that isn't in ground truth
+    # False Positive Logic: deduct 0.05 for setiap finding that isn't in ground truth
     false_positives = 0
     for f in payload.findings:
         matched_idx, score, fb = _match_finding(f, ref_vulns, matched_indices)
@@ -111,8 +111,8 @@ def grade(action: Action, reference: Dict[str, Any]) -> Observation:
             feedback_parts.append(fb)
         else:
             false_positives += 1
-            fb = f"False positive: {f.cwe_id} at line {f.line_number}"
-            # Log it, deduction applied at the end
+            fb = f"False positive reported: {f.cwe_id} at line {f.line_number}"
+            # Log it, deduction applied later
             feedback_parts.append(fb)
 
     # --- Missed vulnerabilities ---
@@ -120,7 +120,7 @@ def grade(action: Action, reference: Dict[str, Any]) -> Observation:
     for idx, ref in enumerate(ref_vulns):
         if idx not in matched_indices:
             sev = ref.get("severity", "unknown").upper()
-            fb = f"Missed {ref['cwe_id']} at line {ref['line_number']} (severity: {sev})"
+            fb = f"Failure: missed {ref['cwe_id']} at line {ref['line_number']} (severity: {sev})"
             sub_scores.append(SubScore(name=f"missed_{ref['cwe_id']}", score=0.0, feedback=fb))
             feedback_parts.append(fb)
             if sev in ["CRITICAL", "BLOCKER"]:
@@ -137,7 +137,7 @@ def grade(action: Action, reference: Dict[str, Any]) -> Observation:
     # --- Critical Penalty: multiply total score by 0.7 if CRITICAL or BLOCKER missed ---
     if missed_critical_or_blocker:
         raw_score *= 0.7
-        fb = "⚠ CRITICAL or BLOCKER vulnerability missed -> 0.7x penalty applied"
+        fb = "Critical failure: CRITICAL or BLOCKER vulnerability missed -> 0.7x multiplier applied"
         feedback_parts.append(fb)
         sub_scores.append(SubScore(name="critical_penalty", score=0.7, feedback=fb))
 
@@ -145,7 +145,7 @@ def grade(action: Action, reference: Dict[str, Any]) -> Observation:
     fp_penalty = min(false_positives * 0.05, 0.2)
     if fp_penalty > 0:
         raw_score = max(0.0, raw_score - fp_penalty)
-        fb = f"False positive penalty: -{fp_penalty:.2f} ({false_positives} FPs reported)"
+        fb = f"Performance deduction: -{fp_penalty:.2f} for {false_positives} false positives"
         feedback_parts.append(fb)
         sub_scores.append(SubScore(name="fp_penalty", score=round(1.0 - fp_penalty, 2), feedback=fb))
 
