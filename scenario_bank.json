@@ -314,6 +314,28 @@
           }
         ]
       }
+    },
+    {
+      "id": "dependency-006",
+      "type": "dependency",
+      "description": "Critical Performance: Fix CUDA OOM/Memory leak via PyTorch upgrade",
+      "context": {
+        "package": "torch",
+        "current_version": "2.2.0",
+        "target_version": "2.3.0",
+        "changelog_summary": "PyTorch 2.3 resolves a major CUDA memory leak in CUDAGraphs and NCCL backends. It significantly reduces memory fragmentation in torch.compile workflows. Essential for large model training."
+      },
+      "reference": {
+        "updates": [
+          {
+            "package": "torch",
+            "from_version": "2.2.0",
+            "to_version": "2.3.0",
+            "is_breaking": false,
+            "migration_keywords": ["cudagraph", "memory leak", "oom", "fragmentation", "compile", "nccl", "cuda"]
+          }
+        ]
+      }
     }
   ]
 }
