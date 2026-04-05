@@ -1,28 +1,44 @@
 from __future__ import annotations
-
+from enum import Enum
 from typing import Any, Dict, List, Literal, Union
-
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
+class ActionType(str, Enum):
+    TRIAGE = "triage"
+    SECURITY = "security"
+    DEPENDENCY = "dependency"
+
+class EnvState(BaseModel):
+    completed_scenarios: List[str] = []
+    scores: Dict[str, float] = {}
+    episode_done: bool = False
+    current_scenario_idx: int = 0
 
 class Observation(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    task_id: str
+    task_id: str | None = None
     scenario_id: str
-    context: str
-    available_actions: list[str]
-    step_number: int
-    episode_id: str
+    context: Any | None = None
+    available_actions: List[str] | None = None
+    step_number: int | None = None
+    episode_id: str | None = None
+    
+    # Grading results (optional for initial reset)
+    action_type: str | None = None
+    total_score: float | None = None
+    sub_scores: List[Dict[str, Any]] | None = None
+    feedback: str | None = None
+    done: bool = False
 
 
 class TriageAction(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    category: Literal["bug", "feature", "docs", "question"]
+    category: Literal["bug", "feature", "documentation", "performance", "docs", "question"]
     severity: Literal["low", "medium", "high", "critical"]
-    module_label: str
-    oncall_routing: str
+    assignee: str
+    decision: Literal["stop", "continue"]
 
 
 class Finding(BaseModel):
@@ -40,12 +56,20 @@ class SecurityAuditAction(BaseModel):
     findings: List[Finding]
 
 
+class DependencyUpdate(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    package: str
+    from_version: str
+    to_version: str
+    is_breaking: bool
+    migration_notes: str
+
+
 class DependencyAction(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    updated_version: str
-    breaking_changes: List[str]
-    migration_description: str
+    updates: List[DependencyUpdate]
 
 
 Action = Union[TriageAction, SecurityAuditAction, DependencyAction]
@@ -78,13 +102,13 @@ def parse_action_union(payload: Dict[str, Any]) -> Action:
 
 def model_validate_action(payload: Dict[str, Any], task_id: str) -> Action:
     """Validate payload against the task-specific action model."""
+    task_norm = task_id.lower().replace("task_", "").replace("_update", "").replace("_audit", "")
     model_by_task = {
-        "task_triage": TriageAction,
-        "task_security_audit": SecurityAuditAction,
-        "task_dependency_update": DependencyAction,
-        "task_dependency": DependencyAction,
+        "triage": TriageAction,
+        "security": SecurityAuditAction,
+        "dependency": DependencyAction,
     }
-    action_model = model_by_task.get(task_id)
+    action_model = model_by_task.get(task_norm)
     if action_model is None:
-        raise ValueError(f"Unknown task_id for action validation: {task_id}")
+        raise ValueError(f"Unknown task_id for action validation: {task_id} (norm={task_norm})")
     return action_model.model_validate(payload)
