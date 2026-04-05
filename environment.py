@@ -1,5 +1,5 @@
-from __future__ import annotations
-
+import json
+from pathlib import Path
 import uuid
 from typing import Any
 
@@ -13,12 +13,20 @@ from models import (
     State,
     TriageAction,
 )
-from scenario_bank import SCENARIO_BANK
-
 
 class CodingEnvironment:
-    def __init__(self, scenario_bank: dict[str, list[dict[str, Any]]] | None = None) -> None:
-        self.scenario_bank = scenario_bank or SCENARIO_BANK
+    def __init__(self, scenario_bank_path: str = "scenario_bank.json") -> None:
+        with open(scenario_bank_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        scenarios = data["scenarios"]
+        # Map by type: list of scenarios
+        self.scenario_bank = {}
+        for s in scenarios:
+            t = s["type"]
+            if t not in self.scenario_bank:
+                self.scenario_bank[t] = []
+            self.scenario_bank[t].append(s)
+            
         self.episode_id: str | None = None
         self.current_task_id: str | None = None
         self.current_scenario_id: str | None = None
@@ -27,10 +35,12 @@ class CodingEnvironment:
         self.cumulative_reward: float = 0.0
 
     def reset(self, task_id: str, scenario_index: int) -> Observation:
-        if task_id not in self.scenario_bank:
-            raise ValueError(f"Unknown task_id: {task_id}")
+        # Map task IDs: task_triage -> triage, etc.
+        lookup_id = task_id.replace("task_", "").replace("_update", "").replace("_audit", "")
+        if lookup_id not in self.scenario_bank:
+            raise ValueError(f"Unknown task_id: {task_id} (lookup={lookup_id})")
 
-        scenarios = self.scenario_bank[task_id]
+        scenarios = self.scenario_bank[lookup_id]
         if scenario_index < 0 or scenario_index >= len(scenarios):
             raise IndexError(
                 f"Scenario index out of range for {task_id}: {scenario_index}"
@@ -50,12 +60,14 @@ class CodingEnvironment:
         if self.current_task_id is None or self._current_scenario is None:
             raise RuntimeError("Environment is not initialized. Call reset() first.")
 
+        # Task ID to model mapping
+        task_norm = self.current_task_id.lower().replace("task_", "").replace("_update", "").replace("_audit", "")
+        
         expected_action = {
-            "task_triage": TriageAction,
-            "task_security_audit": SecurityAuditAction,
-            "task_dependency_update": DependencyAction,
-            "task_dependency": DependencyAction,
-        }.get(self.current_task_id)
+            "triage": TriageAction,
+            "security": SecurityAuditAction,
+            "dependency": DependencyAction,
+        }.get(task_norm)
 
         if expected_action is None:
             raise ValueError(f"No action contract defined for task: {self.current_task_id}")
@@ -65,11 +77,13 @@ class CodingEnvironment:
                 f"Task {self.current_task_id} requires {expected_action.__name__} got {type(action).__name__}"
             )
 
-        grader = GRADER_MAP.get(self.current_task_id)
+        # Grader mapping also needs the normalized task name
+        grader = GRADER_MAP.get(task_norm) or GRADER_MAP.get(self.current_task_id)
         if grader is None:
             raise ValueError(f"No grader defined for task: {self.current_task_id}")
         
-        ground_truth = self._current_scenario["ground_truth"]
+        # Use 'reference' per scenario_bank.json spec
+        ground_truth = self._current_scenario["reference"]
         reward = grader(action, ground_truth)
 
         self.step_count += 1
