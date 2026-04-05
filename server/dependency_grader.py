@@ -31,9 +31,6 @@ def _normalize_version(v: str) -> str:
 def _version_score(agent_updates: List[DependencyUpdate], ref_updates: List[Dict[str, Any]]) -> SubScore:
     """
     Score how well the agent identified the correct target versions.
-
-    Each reference package that the agent correctly updates to the expected
-    version earns 1/N points.
     """
     ref_map: Dict[str, str] = {
         r["package"].lower(): _normalize_version(r["to_version"])
@@ -41,7 +38,7 @@ def _version_score(agent_updates: List[DependencyUpdate], ref_updates: List[Dict
     }
 
     if not ref_map:
-        return SubScore(name="version", score=1.0, feedback="No version updates expected")
+        return SubScore(name="version", score=1.0, feedback="Correct: no version updates needed")
 
     hits = 0
     details: List[str] = []
@@ -52,24 +49,25 @@ def _version_score(agent_updates: List[DependencyUpdate], ref_updates: List[Dict
             actual = _normalize_version(upd.to_version)
             if actual == expected:
                 hits += 1
-                details.append(f"✓ {upd.package} → {actual}")
+                details.append(f"✓ '{upd.package}' updated to correct version {actual}")
             else:
-                details.append(f"✗ {upd.package}: expected {expected}, got {actual}")
+                details.append(f"✗ '{upd.package}': expected {expected}, got {actual}")
 
     score = hits / len(ref_map)
+    msg = f"Version Accuracy: identified {hits}/{len(ref_map)} target versions correctly"
+    if details:
+        msg += " (" + "; ".join(details) + ")"
+        
     return SubScore(
         name="version",
         score=round(score, 4),
-        feedback="; ".join(details) if details else "No matching packages found",
+        feedback=msg,
     )
 
 
 def _breaking_recall(agent_updates: List[DependencyUpdate], ref_updates: List[Dict[str, Any]]) -> SubScore:
     """
     Recall on correctly flagging breaking changes.
-
-    Each reference breaking update that the agent correctly marks as
-    `is_breaking=True` earns 1/B points (B = total breaking updates).
     """
     ref_breaking: Dict[str, bool] = {
         r["package"].lower(): True
@@ -78,7 +76,7 @@ def _breaking_recall(agent_updates: List[DependencyUpdate], ref_updates: List[Di
     }
 
     if not ref_breaking:
-        return SubScore(name="breaking_recall", score=1.0, feedback="No breaking changes in reference")
+        return SubScore(name="breaking_recall", score=1.0, feedback="Correct: no breaking changes in reference")
 
     agent_map: Dict[str, bool] = {u.package.lower(): u.is_breaking for u in agent_updates}
 
@@ -92,10 +90,14 @@ def _breaking_recall(agent_updates: List[DependencyUpdate], ref_updates: List[Di
             details.append(f"✗ {pkg} breaking change missed")
 
     score = hits / len(ref_breaking)
+    msg = f"Breaking Change Recall: {hits}/{len(ref_breaking)} breaking updates successfully flagged"
+    if details:
+        msg += " (" + "; ".join(details) + ")"
+        
     return SubScore(
         name="breaking_recall",
         score=round(score, 4),
-        feedback="; ".join(details),
+        feedback=msg,
     )
 
 
@@ -106,12 +108,7 @@ def _tokenize(text: str) -> Set[str]:
 
 def _migration_score(agent_updates: List[DependencyUpdate], ref_updates: List[Dict[str, Any]]) -> SubScore:
     """
-    Score migration notes quality via keyword overlap with reference keywords.
-
-    For each reference update that has `migration_keywords`, compute:
-        overlap = |agent_tokens ∩ ref_keywords| / |ref_keywords|
-
-    No LLMs — pure keyword overlap.
+    Score migration notes quality via keyword overlap.
     """
     scored_packages: List[str] = []
     scores: List[float] = []
@@ -123,7 +120,7 @@ def _migration_score(agent_updates: List[DependencyUpdate], ref_updates: List[Di
     }
 
     if not ref_migration:
-        return SubScore(name="migration", score=1.0, feedback="No migration keywords in reference")
+        return SubScore(name="migration", score=1.0, feedback="Correct: no migration notes required")
 
     agent_map: Dict[str, str] = {u.package.lower(): u.migration_notes for u in agent_updates}
 
@@ -137,33 +134,23 @@ def _migration_score(agent_updates: List[DependencyUpdate], ref_updates: List[Di
 
         overlap = len(agent_tokens & ref_kw_set) / len(ref_kw_set)
         scores.append(overlap)
-        scored_packages.append(f"{pkg}: {overlap:.0%} keyword overlap")
+        scored_packages.append(f"{pkg}: {overlap:.0%} overlap with expected migration concepts")
 
     if not scores:
-        return SubScore(name="migration", score=0.0, feedback="No migration notes matched")
+        return SubScore(name="migration", score=0.0, feedback="Failure: migration notes were missing or lacked key terms")
 
     avg = sum(scores) / len(scores)
     return SubScore(
         name="migration",
         score=round(avg, 4),
-        feedback="; ".join(scored_packages),
+        feedback="Migration Analysis Quality: " + "; ".join(scored_packages),
     )
 
 
 def grade(action: Action, reference: Dict[str, Any]) -> Observation:
     """
     Grade a dependency-update action.
-
-    Weighted formula:
-        total = 0.2 × version + 0.4 × breaking_recall + 0.4 × migration
-
-    Parameters
-    ----------
-    action : Action
-        Agent's proposed dependency updates.
-    reference : dict
-        Expected answer with 'updates' list containing package, to_version,
-        is_breaking, migration_keywords.
+    Formula: 0.2 × version + 0.4 × breaking_recall + 0.4 × migration
     """
     payload = action.parse_dependency()
     ref_updates: List[Dict[str, Any]] = reference.get("updates", [])
@@ -179,16 +166,16 @@ def grade(action: Action, reference: Dict[str, Any]) -> Observation:
 
     sub_scores = [v_score, b_score, m_score]
     feedback = (
-        f"version={v_score.score:.2f} (w=0.2) | "
-        f"breaking_recall={b_score.score:.2f} (w=0.4) | "
-        f"migration={m_score.score:.2f} (w=0.4) | "
-        f"weighted_total={total:.4f}"
+        f"Version Score: {v_score.score:.2f} (weight 0.2) | "
+        f"Breaking Recall: {b_score.score:.2f} (weight 0.4) | "
+        f"Migration Analysis: {m_score.score:.2f} (weight 0.4) | "
+        f"Final Weighted Total: {total:.4f}"
     )
 
     return Observation(
         scenario_id=action.scenario_id,
         action_type=action.action_type,
-        total_score=total,
+        total_score=max(0.0, min(1.0, total)),
         sub_scores=sub_scores,
         feedback=feedback,
     )

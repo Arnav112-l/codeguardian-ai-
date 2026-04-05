@@ -157,23 +157,23 @@ Every `/step` call returns a structured **Observation**:
 ---
 
 ## Scoring Formulas
-
-### Triage (avg of 4 dimensions)
+### Triage (avg of Cat, Sev, Routing)
 - **Category**: 1.0 exact, 0.0 wrong
-- **Severity**: 1.0 exact, 0.5 one level off, 0.0 otherwise (ordinal: low=0, medium=1, high=2, critical=3)
+- **Severity**: 1.0 exact, 0.5 adjacent, 0.0 otherwise (ordinal: low=0, medium=1, high=2, critical=3)
 - **Routing**: 1.0 exact assignee, 0.5 correct domain, 0.0 wrong
-- **Decision**: 1.0 correct, 0.0 wrong. Rules: `oncall:distributed` → STOP, `oncall:pt2` → CONTINUE
+- **Decision**: 1.0 correct, 0.0 wrong (logged as sub-score but not in total average)
 
-### Security
-- **Match**: CWE must match + line within ±2. Score: 0.6 base + 0.4 × keyword bonus
-- **Recall**: ×0.7 multiplier if CRITICAL vulnerability missed
-- **False Positives**: −0.05 per FP (max −0.2)
+### Security (0.6 Base + 0.4 Quality)
+- **Match**: CWE must match exactly and line within ±2 range.
+- **Scoring**: 0.6 base for match + 0.4 bonus for keyword overlap in fix description.
+- **Penalty**: 0.7x multiplier applied if a CRITICAL or BLOCKER vulnerability is missed.
+- **False Positives**: -0.05 deduction per reported finding that is not in ground truth (max -0.2).
 
-### Dependency
-```
-total = 0.2 × version_score + 0.4 × breaking_recall + 0.4 × migration_score
-```
-Migration scored via keyword overlap (no LLMs).
+### Dependency Updater
+- **Version**: 0.2 weight (exact version match)
+- **Breaking Recall**: 0.4 weight (flagging breaking changes)
+- **Migration Quality**: 0.4 weight (keyword overlap against reference)
+- **Zero-LLM Loop**: Grading uses purely programmatic string/keyword logic.
 
 ---
 
