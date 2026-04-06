@@ -37,9 +37,9 @@ def test_2_invalid_step_number_type_raises_validation_error() -> None:
 
 
 def test_3_missing_required_field_raises_validation_error() -> None:
+    # Missing required 'scenario_id' field should raise ValidationError
     payload = {
         "task_id": "task_triage",
-        "scenario_id": "triage-001",
         "context": "Incoming ticket about login failures",
         "available_actions": ["triage"],
         "step_number": 0,
@@ -53,8 +53,8 @@ def test_4_action_union_discriminates_triage_and_security() -> None:
     triage_payload = {
         "category": "bug",
         "severity": "high",
-        "module_label": "auth",
-        "oncall_routing": "backend-oncall",
+        "assignee": "oncall:backend",
+        "decision": "stop",
     }
     security_payload = {
         "findings": [

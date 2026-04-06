@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -131,3 +131,66 @@ async def get_state():
         "scores": _state.scores,
         "episode_done": _state.episode_done
     }
+
+@app.get("/scenarios")
+async def get_scenarios():
+    """List all scenarios with context (without reference answers)."""
+    scenarios_public = []
+    for s in SCENARIOS:
+        scenarios_public.append({
+            "id": s["id"],
+            "type": s["type"],
+            "description": s.get("description", ""),
+            "context": s["context"],
+            "difficulty": "easy" if s["type"] == "triage" else ("medium" if s["type"] == "security" else "hard")
+        })
+    return {
+        "total": len(SCENARIOS),
+        "scenarios": scenarios_public
+    }
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time agent communication."""
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_json()
+            action_type = data.get("action_type")
+            scenario_id = data.get("scenario_id")
+            payload = data.get("payload", {})
+            
+            # Process like /step but via WebSocket
+            scenario = SCENARIO_MAP.get(scenario_id)
+            if not scenario:
+                await websocket.send_json({"error": "Unknown scenario", "code": 404})
+                continue
+            
+            if action_type != scenario["type"]:
+                await websocket.send_json({"error": "Type mismatch", "code": 422})
+                continue
+            
+            task_id = "task_" + action_type
+            if action_type == "dependency":
+                task_id = "task_dependency_update"
+            
+            try:
+                action_payload = model_validate_action(payload, task_id)
+                grader = GRADER_MAP.get(action_type)
+                reference = scenario["reference"]
+                reward = grader(action_payload, reference)
+                
+                api_sub_scores = [{"name": k, "score": v} for k, v in reward.sub_scores.items()]
+                
+                await websocket.send_json({
+                    "scenario_id": scenario_id,
+                    "action_type": action_type,
+                    "total_score": float(reward.total_score),
+                    "sub_scores": api_sub_scores,
+                    "feedback": reward.feedback,
+                    "done": False
+                })
+            except Exception as e:
+                await websocket.send_json({"error": str(e), "code": 422})
+    except WebSocketDisconnect:
+        logger.info("WebSocket client disconnected")

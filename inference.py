@@ -96,14 +96,12 @@ def _mock_action_for_task(task_id: str) -> Action:
     if task_id == "task_triage":
         return TriageAction.model_validate(
             {
-                "category": random.choice(["bug", "feature", "docs", "question"]),
+                "category": random.choice(["bug", "feature", "documentation", "performance"]),
                 "severity": random.choice(["low", "medium", "high", "critical"]),
-                "module_label": random.choice(
-                    ["auth-service", "payment-gateway", "analytics-ui", "webhooks"]
+                "assignee": random.choice(
+                    ["oncall:distributed", "oncall:pt2", "oncall:serialization", "oncall:docs", "oncall:performance"]
                 ),
-                "oncall_routing": random.choice(
-                    ["backend-oncall", "support-oncall", "payments-oncall", "product-oncall"]
-                ),
+                "decision": random.choice(["stop", "continue"]),
             }
         )
     if task_id == "task_security_audit":
@@ -112,28 +110,26 @@ def _mock_action_for_task(task_id: str) -> Action:
                 "findings": [
                     {
                         "cwe_id": random.choice(
-                            ["CWE-79", "CWE-89", "CWE-502", "CWE-330", "CWE-862"]
+                            ["CWE-79", "CWE-89", "CWE-502", "CWE-22", "CWE-918"]
                         ),
-                        "line_number": random.randint(5, 120),
+                        "line_number": random.randint(1, 10),
                         "severity": random.choice(["low", "medium", "high", "critical"]),
-                        "fix_description": "Apply secure coding fix and add regression tests.",
+                        "fix_description": "Use parameterized queries and sanitize user input.",
                     }
                 ]
             }
         )
     return DependencyAction.model_validate(
         {
-            "updated_version": random.choice(
-                [
-                    "requests==2.32.3",
-                    "pydantic==2.12.5",
-                    "openai==2.30.0",
-                    "pytest==9.0.2",
-                    "httpx==0.28.1",
-                ]
-            ),
-            "breaking_changes": ["Re-run integration test suite."],
-            "migration_description": "Upgrade package, run compatibility checks, and stage rollout.",
+            "updates": [
+                {
+                    "package": random.choice(["numpy", "pydantic", "flask", "requests", "transformers"]),
+                    "from_version": "1.0.0",
+                    "to_version": random.choice(["2.0.0", "2.5.3", "3.0.0", "2.32.3", "4.40.0"]),
+                    "is_breaking": random.choice([True, False]),
+                    "migration_notes": "Update deprecated APIs, check compatibility, run tests.",
+                }
+            ]
         }
     )
 
