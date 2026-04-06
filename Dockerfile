@@ -26,6 +26,7 @@ COPY __init__.py .
 COPY models.py .
 COPY graders.py .
 COPY scenario_bank.json .
+COPY index.html .
 COPY server/ ./server/
 
 # ── Remove unnecessary files to keep image lean ──
