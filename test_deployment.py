@@ -91,7 +91,7 @@ def main():
         print("Next steps:")
         print("1. Update Excel checklists marking all HF tasks as Done")
         print("2. Tag your Space with 'openenv' in Settings")
-        print("3. Add secrets (HF_TOKEN, OPENAI_API_KEY) in Settings")
+        print("3. Add secret GROQ_API_KEY in Settings")
         print()
         return True
     else:
