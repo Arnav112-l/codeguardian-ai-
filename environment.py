@@ -119,12 +119,15 @@ class CodingEnvironment:
         ):
             raise RuntimeError("Environment has no active episode. Call reset() first.")
 
+        # In scenario_bank.json, the scenario data is under "context"
+        context = self._current_scenario.get("context", {})
+        
         return Observation.model_validate(
             {
                 "task_id": self.current_task_id,
                 "scenario_id": self.current_scenario_id,
-                "context": self._current_scenario["context"],
-                "available_actions": self._current_scenario["available_actions"],
+                "context": str(context),  # Convert dict to string for observation
+                "available_actions": ["submit"], # Default generic action
                 "step_number": step_number,
                 "episode_id": self.episode_id,
             }
