@@ -7,7 +7,10 @@
       "context": {
         "title": "OOM crash during DDP training with NCCL 2.18",
         "body": "After upgrading NCCL from 2.17 to 2.18, our distributed training jobs crash with OOM after ~200 iterations. The leak seems to come from all-reduce buffers not being freed. Reproducible on 8xA100.",
-        "labels": ["module: distributed", "high priority"]
+        "labels": [
+          "module: distributed",
+          "high priority"
+        ]
       },
       "reference": {
         "category": "bug",
@@ -15,7 +18,11 @@
         "assignee": "oncall:distributed",
         "domain": "oncall:",
         "decision": "stop"
-      }
+      },
+      "difficulty": "easy",
+      "available_actions": [
+        "triage"
+      ]
     },
     {
       "id": "triage-002",
@@ -24,7 +31,10 @@
       "context": {
         "title": "torch.compile fails silently on custom C++ ops registered via torch.library",
         "body": "When using torch.compile on a model that uses custom ops registered with torch.library, the compiler silently falls back to eager mode. Expected: either compile the custom op or raise a clear error. This affects PT2 adoption significantly.",
-        "labels": ["module: pt2", "feature request"]
+        "labels": [
+          "module: pt2",
+          "feature request"
+        ]
       },
       "reference": {
         "category": "feature",
@@ -32,7 +42,11 @@
         "assignee": "oncall:pt2",
         "domain": "oncall:",
         "decision": "continue"
-      }
+      },
+      "difficulty": "easy",
+      "available_actions": [
+        "triage"
+      ]
     },
     {
       "id": "triage-003",
@@ -41,7 +55,10 @@
       "context": {
         "title": "torch.save() produces corrupted checkpoints on NFS with >10GB models",
         "body": "When saving models larger than 10GB to NFS-mounted storage, the checkpoint file is silently corrupted. Loading the checkpoint produces incorrect tensor shapes. This is a data-loss scenario. Affects production training pipelines.",
-        "labels": ["module: serialization", "critical"]
+        "labels": [
+          "module: serialization",
+          "critical"
+        ]
       },
       "reference": {
         "category": "bug",
@@ -49,7 +66,11 @@
         "assignee": "oncall:serialization",
         "domain": "oncall:",
         "decision": "stop"
-      }
+      },
+      "difficulty": "easy",
+      "available_actions": [
+        "triage"
+      ]
     },
     {
       "id": "triage-004",
@@ -58,7 +79,10 @@
       "context": {
         "title": "Docs for torch.autograd.Function lack examples for vmap support",
         "body": "The documentation for custom autograd functions doesn't cover how to make them compatible with vmap/functorch. Several users have asked about this. Adding 2-3 examples would significantly improve the developer experience.",
-        "labels": ["module: docs", "good first issue"]
+        "labels": [
+          "module: docs",
+          "good first issue"
+        ]
       },
       "reference": {
         "category": "documentation",
@@ -66,7 +90,11 @@
         "assignee": "oncall:docs",
         "domain": "oncall:",
         "decision": "continue"
-      }
+      },
+      "difficulty": "easy",
+      "available_actions": [
+        "triage"
+      ]
     },
     {
       "id": "triage-005",
@@ -75,7 +103,10 @@
       "context": {
         "title": "20% slowdown in conv2d on CPU after PR #98765",
         "body": "After merging PR #98765 (memory layout optimization), conv2d performance regressed by ~20% on CPU for batch_size=1. GPU perf is unaffected. Bisected to commit abc123. This blocks the 2.3 release.",
-        "labels": ["module: performance", "release blocker"]
+        "labels": [
+          "module: performance",
+          "release blocker"
+        ]
       },
       "reference": {
         "category": "performance",
@@ -83,7 +114,11 @@
         "assignee": "oncall:performance",
         "domain": "oncall:",
         "decision": "stop"
-      }
+      },
+      "difficulty": "easy",
+      "available_actions": [
+        "triage"
+      ]
     },
     {
       "id": "security-001",
@@ -100,10 +135,18 @@
             "cwe_id": "CWE-89",
             "line_number": 2,
             "severity": "critical",
-            "fix_keywords": ["parameterized", "prepared statement", "bound parameter"]
+            "fix_keywords": [
+              "parameterized",
+              "prepared statement",
+              "bound parameter"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "medium",
+      "available_actions": [
+        "security"
+      ]
     },
     {
       "id": "security-002",
@@ -120,10 +163,19 @@
             "cwe_id": "CWE-79",
             "line_number": 2,
             "severity": "high",
-            "fix_keywords": ["sanitize", "escape", "dompurify", "bleach"]
+            "fix_keywords": [
+              "sanitize",
+              "escape",
+              "dompurify",
+              "bleach"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "medium",
+      "available_actions": [
+        "security"
+      ]
     },
     {
       "id": "security-003",
@@ -140,16 +192,28 @@
             "cwe_id": "CWE-502",
             "line_number": 4,
             "severity": "critical",
-            "fix_keywords": ["safe loader", "safetensors", "json", "allowlist"]
+            "fix_keywords": [
+              "safe loader",
+              "safetensors",
+              "json",
+              "allowlist"
+            ]
           },
           {
             "cwe_id": "CWE-502",
             "line_number": 8,
             "severity": "high",
-            "fix_keywords": ["yaml.safe_load", "safe loader"]
+            "fix_keywords": [
+              "yaml.safe_load",
+              "safe loader"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "medium",
+      "available_actions": [
+        "security"
+      ]
     },
     {
       "id": "security-004",
@@ -166,10 +230,19 @@
             "cwe_id": "CWE-22",
             "line_number": 3,
             "severity": "high",
-            "fix_keywords": ["realpath", "canonicalize", "basename", "path traversal"]
+            "fix_keywords": [
+              "realpath",
+              "canonicalize",
+              "basename",
+              "path traversal"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "medium",
+      "available_actions": [
+        "security"
+      ]
     },
     {
       "id": "security-005",
@@ -186,10 +259,20 @@
             "cwe_id": "CWE-918",
             "line_number": 3,
             "severity": "high",
-            "fix_keywords": ["allowlist", "url validation", "ssrf", "internal", "deny list"]
+            "fix_keywords": [
+              "allowlist",
+              "url validation",
+              "ssrf",
+              "internal",
+              "deny list"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "medium",
+      "available_actions": [
+        "security"
+      ]
     },
     {
       "id": "dependency-001",
@@ -208,20 +291,35 @@
             "from_version": "1.24.4",
             "to_version": "2.0.0",
             "is_breaking": true,
-            "migration_keywords": ["deprecated", "int64", "distutils", "string", "repr", "dtype", "api", "removed", "ravel", "ndarray"]
+            "migration_keywords": [
+              "deprecated",
+              "int64",
+              "distutils",
+              "string",
+              "repr",
+              "dtype",
+              "api",
+              "removed",
+              "ravel",
+              "ndarray"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "hard",
+      "available_actions": [
+        "dependency"
+      ]
     },
     {
       "id": "dependency-002",
       "type": "dependency",
-      "description": "Upgrade Pydantic v1 → v2",
+      "description": "Upgrade Pydantic v1 \u00e2\u2020\u2019 v2",
       "context": {
         "package": "pydantic",
         "current_version": "1.10.13",
         "target_version": "2.5.3",
-        "changelog_summary": "Pydantic V2 is a full rewrite using pydantic-core. Major changes: BaseModel.dict() → model_dump(), validator → field_validator, Config class → model_config dict."
+        "changelog_summary": "Pydantic V2 is a full rewrite using pydantic-core. Major changes: BaseModel.dict() \u00e2\u2020\u2019 model_dump(), validator \u00e2\u2020\u2019 field_validator, Config class \u00e2\u2020\u2019 model_config dict."
       },
       "reference": {
         "updates": [
@@ -230,20 +328,35 @@
             "from_version": "1.10.13",
             "to_version": "2.5.3",
             "is_breaking": true,
-            "migration_keywords": ["model_dump", "field_validator", "model_config", "pydantic_core", "basemodel", "dict", "validator", "rewrite", "v2", "schema"]
+            "migration_keywords": [
+              "model_dump",
+              "field_validator",
+              "model_config",
+              "pydantic_core",
+              "basemodel",
+              "dict",
+              "validator",
+              "rewrite",
+              "v2",
+              "schema"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "hard",
+      "available_actions": [
+        "dependency"
+      ]
     },
     {
       "id": "dependency-003",
       "type": "dependency",
-      "description": "Upgrade Flask 2.x → 3.0 and Werkzeug",
+      "description": "Upgrade Flask 2.x \u00e2\u2020\u2019 3.0 and Werkzeug",
       "context": {
         "package": "flask",
         "current_version": "2.3.3",
         "target_version": "3.0.0",
-        "changelog_summary": "Flask 3.0 drops Python 3.7 support, removes deprecated code, requires Werkzeug >= 3.0. Blueprints no longer support the `name` argument — use `import_name`."
+        "changelog_summary": "Flask 3.0 drops Python 3.7 support, removes deprecated code, requires Werkzeug >= 3.0. Blueprints no longer support the `name` argument \u00e2\u20ac\u201d use `import_name`."
       },
       "reference": {
         "updates": [
@@ -252,17 +365,37 @@
             "from_version": "2.3.3",
             "to_version": "3.0.0",
             "is_breaking": true,
-            "migration_keywords": ["werkzeug", "blueprint", "import_name", "python37", "deprecated", "name", "async", "removed"]
+            "migration_keywords": [
+              "werkzeug",
+              "blueprint",
+              "import_name",
+              "python37",
+              "deprecated",
+              "name",
+              "async",
+              "removed"
+            ]
           },
           {
             "package": "werkzeug",
             "from_version": "2.3.8",
             "to_version": "3.0.1",
             "is_breaking": true,
-            "migration_keywords": ["url_map", "routing", "converters", "removed", "deprecated", "security"]
+            "migration_keywords": [
+              "url_map",
+              "routing",
+              "converters",
+              "removed",
+              "deprecated",
+              "security"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "hard",
+      "available_actions": [
+        "dependency"
+      ]
     },
     {
       "id": "dependency-004",
@@ -281,15 +414,24 @@
             "from_version": "2.31.0",
             "to_version": "2.32.3",
             "is_breaking": false,
-            "migration_keywords": ["session", "certificate", "bugfix", "patch"]
+            "migration_keywords": [
+              "session",
+              "certificate",
+              "bugfix",
+              "patch"
+            ]
           }
         ]
-      }
+      },
+      "difficulty": "hard",
+      "available_actions": [
+        "dependency"
+      ]
     },
     {
       "id": "dependency-005",
       "type": "dependency",
-      "description": "Upgrade transformers 4.36 → 4.40 with new pipeline breaking changes",
+      "description": "Upgrade transformers 4.36 \u00e2\u2020\u2019 4.40 with new pipeline breaking changes",
       "context": {
         "package": "transformers",
         "current_version": "4.36.0",
@@ -303,39 +445,34 @@
             "from_version": "4.36.0",
             "to_version": "4.40.0",
             "is_breaking": true,
-            "migration_keywords": ["attention", "pipeline", "tokenizers", "config", "deprecated", "sdpa", "flash", "renamed"]
+            "migration_keywords": [
+              "attention",
+              "pipeline",
+              "tokenizers",
+              "config",
+              "deprecated",
+              "sdpa",
+              "flash",
+              "renamed"
+            ]
           },
           {
             "package": "tokenizers",
             "from_version": "0.15.2",
             "to_version": "0.19.1",
             "is_breaking": false,
-            "migration_keywords": ["rust", "performance", "compatible"]
+            "migration_keywords": [
+              "rust",
+              "performance",
+              "compatible"
+            ]
           }
         ]
-      }
-    },
-    {
-      "id": "dependency-006",
-      "type": "dependency",
-      "description": "Critical Performance: Fix CUDA OOM/Memory leak via PyTorch upgrade",
-      "context": {
-        "package": "torch",
-        "current_version": "2.2.0",
-        "target_version": "2.3.0",
-        "changelog_summary": "PyTorch 2.3 resolves a major CUDA memory leak in CUDAGraphs and NCCL backends. It significantly reduces memory fragmentation in torch.compile workflows. Essential for large model training."
       },
-      "reference": {
-        "updates": [
-          {
-            "package": "torch",
-            "from_version": "2.2.0",
-            "to_version": "2.3.0",
-            "is_breaking": false,
-            "migration_keywords": ["cudagraph", "memory leak", "oom", "fragmentation", "compile", "nccl", "cuda"]
-          }
-        ]
-      }
+      "difficulty": "hard",
+      "available_actions": [
+        "dependency"
+      ]
     }
   ]
 }

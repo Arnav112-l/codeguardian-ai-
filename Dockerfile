@@ -22,7 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && rm -rf /tmp/* /var/tmp/* /root/.cache
 
 # ── Copy application code ──
+COPY __init__.py .
 COPY models.py .
+COPY graders.py .
 COPY scenario_bank.json .
 COPY server/ ./server/
 
