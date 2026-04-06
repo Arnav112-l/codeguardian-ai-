@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -35,6 +36,10 @@ SCENARIO_MAP = {s["id"]: s for s in SCENARIOS}
 
 # --- APP ---
 app = FastAPI(title="OptiMaintainer")
+
+@app.get("/demo")
+def demo():
+    return FileResponse(PROJECT_ROOT / "index.html")
 
 app.add_middleware(
     CORSMiddleware,
