@@ -1,3 +1,15 @@
+---
+title: CodeGuardian AI
+emoji: 🛡️
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+tags:
+  - openenv
+---
+
 # 🔧 OptiMaintainer
 
 **Production-grade OpenEnv environment for grading AI agents on open-source repository maintenance.**
