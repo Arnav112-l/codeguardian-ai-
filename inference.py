@@ -13,9 +13,9 @@ from environment import CodingEnvironment
 from models import Action, DependencyAction, SecurityAuditAction, TriageAction, model_validate_action
 
 try:
-    from openai import OpenAI
+    from groq import Groq
 except Exception:  # pragma: no cover - handled at runtime for mock-only workflows
-    OpenAI = None  # type: ignore[assignment]
+    Groq = None  # type: ignore[assignment]
 
 
 TASKS = ["task_triage", "task_security_audit", "task_dependency_update"]
@@ -166,33 +166,20 @@ def run(mock: bool) -> int:
     env = CodingEnvironment()
     results_path = "results.jsonl"
 
-    model_name = os.getenv("MODEL_NAME", "mock-model" if mock else "")
-    api_base_url = os.getenv("API_BASE_URL", "")
-    hf_token = os.getenv("HF_TOKEN", "")
+    model_name = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile" if not mock else "mock-model")
+    groq_api_key = os.getenv("GROQ_API_KEY", "")
 
     client: Any = None
     if not mock:
-        missing = [
-            key
-            for key, value in {
-                "MODEL_NAME": model_name,
-                "API_BASE_URL": api_base_url,
-                "HF_TOKEN": hf_token,
-            }.items()
-            if not value
-        ]
-        if missing:
-            print(
-                f"Missing required environment variables for live run: {', '.join(missing)}",
-                file=sys.stderr,
-            )
+        if not groq_api_key:
+            print("Missing required environment variable: GROQ_API_KEY", file=sys.stderr)
             return 1
 
-        if OpenAI is None:
-            print("openai package is not available. Install requirements first.", file=sys.stderr)
+        if Groq is None:
+            print("groq package is not available. Install requirements first.", file=sys.stderr)
             return 1
 
-        client = OpenAI(base_url=api_base_url, api_key=hf_token)
+        client = Groq(api_key=groq_api_key)
 
     scores_by_task: dict[str, list[float]] = defaultdict(list)
 
