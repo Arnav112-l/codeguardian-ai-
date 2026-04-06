@@ -669,7 +669,7 @@
 
                 const result = await response.json();
                 showResult(result);
-                updateScoreBars(result.reward);
+                updateScoreBars(result);
                 showLoading(false);
                 
             } catch (error) {
@@ -684,7 +684,19 @@
             const resultDiv = document.getElementById('resultDisplay');
             resultDiv.classList.remove('hidden');
             
-            const score = (result.reward.total_score * 100).toFixed(1);
+            const score = (result.total_score * 100).toFixed(1);
+            
+            // Format sub_scores as a readable list
+            let subScoresHtml = '';
+            if (result.sub_scores && Array.isArray(result.sub_scores)) {
+                subScoresHtml = result.sub_scores.map(s => 
+                    `<li><strong>${s.name}:</strong> ${(s.score * 100).toFixed(0)}%</li>`
+                ).join('');
+            } else if (result.sub_scores && typeof result.sub_scores === 'object') {
+                subScoresHtml = Object.entries(result.sub_scores).map(([k, v]) => 
+                    `<li><strong>${k}:</strong> ${(v * 100).toFixed(0)}%</li>`
+                ).join('');
+            }
             
             resultDiv.innerHTML = `
                 <div class="score-display">
@@ -693,14 +705,15 @@
                 </div>
                 <div class="alert alert-success">
                     <strong>Grading Complete!</strong><br>
-                    Sub-scores: ${JSON.stringify(result.reward.sub_scores, null, 2)}
+                    ${result.feedback ? `<p>${result.feedback}</p>` : ''}
+                    ${subScoresHtml ? `<ul style="margin-top: 10px; padding-left: 20px;">${subScoresHtml}</ul>` : ''}
                 </div>
             `;
         }
 
         // Update score bars with animation
-        function updateScoreBars(reward) {
-            const score = reward.total_score * 100;
+        function updateScoreBars(result) {
+            const score = result.total_score * 100;
             const taskType = currentTask;
             
             if (taskType === 'task_triage') {
