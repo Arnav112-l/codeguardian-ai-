@@ -39,7 +39,14 @@ app = FastAPI(title="OptiMaintainer")
 
 @app.get("/demo")
 def demo():
-    return FileResponse(PROJECT_ROOT / "index.html")
+    index_path = PROJECT_ROOT / "index.html"
+    if not index_path.exists():
+        # fallback - search common locations
+        for p in [Path("/app/index.html"), Path("index.html"), Path("../index.html")]:
+            if p.exists():
+                index_path = p
+                break
+    return FileResponse(index_path)
 
 app.add_middleware(
     CORSMiddleware,
