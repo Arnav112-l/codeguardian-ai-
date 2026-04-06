@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeGuardian AI - OpenEnv Grading Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e6ed;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Hero Header */
+        .hero {
+            background: linear-gradient(135deg, #1e2749 0%, #2a3f5f 100%);
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(100, 200, 255, 0.1);
+        }
+
+        .hero h1 {
+            font-size: 3em;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .hero p {
+            font-size: 1.2em;
+            color: #8892a6;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 212, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1024px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel Styles */
+        .panel {
+            background: rgba(30, 39, 73, 0.6);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(100, 200, 255, 0.15);
+        }
+
+        .panel h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #8892a6;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        select, textarea, input {
+            width: 100%;
+            background: rgba(10, 14, 39, 0.6);
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            color: #e0e6ed;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+
+        select {
+            cursor: pointer;
+        }
+
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+
+        /* Buttons */
+        button {
+            background: linear-gradient(135deg, #0099ff 0%, #00d4ff 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 153, 255, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 153, 255, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* Scenario Display */
+        .scenario-box {
+            background: rgba(0, 212, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        /* Score Display */
+        .score-display {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, rgba(0, 212, 255, 0.1) 100%);
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .score-value {
+            font-size: 4em;
+            font-weight: bold;
+            background: linear-gradient(135deg, #00ff88 0%, #00d4ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .score-label {
+            font-size: 1.2em;
+            color: #8892a6;
+        }
+
+        /* Progress Bars */
+        .score-breakdown {
+            margin-top: 20px;
+        }
+
+        .score-item {
+            margin-bottom: 20px;
+        }
+
+        .score-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .score-item-title {
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .difficulty-badge {
+            background: rgba(255, 153, 0, 0.2);
+            color: #ffaa00;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .difficulty-badge.easy { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .difficulty-badge.medium { background: rgba(255, 204, 0, 0.2); color: #ffcc00; }
+        .difficulty-badge.hard { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(10, 14, 39, 0.6);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0099ff 0%, #00d4ff 100%);
+            transition: width 1s ease;
+            border-radius: 4px;
+        }
+
+        /* Architecture Diagram */
+        .architecture {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 40px 20px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .arch-node {
+            background: rgba(0, 153, 255, 0.1);
+            border: 2px solid rgba(0, 153, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            min-width: 140px;
+            position: relative;
+        }
+
+        .arch-node h3 {
+            color: #00d4ff;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .arch-node p {
+            color: #8892a6;
+            font-size: 0.9em;
+        }
+
+        .arch-arrow {
+            color: #00d4ff;
+            font-size: 2em;
+            margin: 0 10px;
+        }
+
+        /* Footer */
+        .footer {
+            background: rgba(30, 39, 73, 0.6);
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 30px;
+            text-align: center;
+            border: 1px solid rgba(100, 200, 255, 0.15);
+        }
+
+        .tech-stack {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .tech-item {
+            background: rgba(0, 212, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid rgba(0, 212, 255, 0.2);
+            border-top: 3px solid #00d4ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Alert Messages */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: #00ff88;
+            color: #00ff88;
+        }
+
+        .alert-error {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+
+        .alert-info {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero Header -->
+        <div class="hero">
+            <h1>🛡️ CodeGuardian AI</h1>
+            <p>Production-Grade OpenEnv Grading Platform for Repository Maintenance Agents</p>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Checking backend...</span>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid">
+            <!-- Live Demo Panel -->
+            <div class="panel">
+                <h2>🎯 Live Demo</h2>
+                
+                <div class="form-group">
+                    <label>Task Type</label>
+                    <select id="taskType">
+                        <option value="task_triage">Issue Triage</option>
+                        <option value="task_security_audit">Security Audit</option>
+                        <option value="task_dependency_update">Dependency Update</option>
+                    </select>
+                </div>
+
+                <div class="btn-group">
+                    <button onclick="startEpisode()" id="startBtn">🚀 Start Episode</button>
+                    <button onclick="runBaseline()" class="btn-secondary" id="baselineBtn">⚡ Run Baseline</button>
+                </div>
+
+                <div id="scenarioDisplay" class="hidden">
+                    <h3 style="color: #00d4ff; margin-top: 20px;">Scenario Context:</h3>
+                    <div class="scenario-box" id="scenarioText"></div>
+                </div>
+
+                <div id="actionPanel" class="hidden">
+                    <div class="form-group">
+                        <label>Agent Action (JSON)</label>
+                        <textarea id="actionInput" placeholder='{"category": "bug", "severity": "high", ...}'></textarea>
+                    </div>
+                    <button onclick="submitAction()" id="submitBtn">✓ Submit Action</button>
+                </div>
+
+                <div id="loadingSpinner" class="hidden">
+                    <div class="spinner"></div>
+                    <p style="text-align: center; color: #8892a6;">Processing...</p>
+                </div>
+
+                <div id="resultDisplay" class="hidden"></div>
+            </div>
+
+            <!-- Scoring Breakdown -->
+            <div class="panel">
+                <h2>📊 Task Scoring</h2>
+                
+                <div class="score-breakdown">
+                    <div class="score-item">
+                        <div class="score-item-header">
+                            <span class="score-item-title">Issue Triage</span>
+                            <span class="difficulty-badge easy">Easy</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="triageBar" style="width: 0%"></div>
+                        </div>
+                        <p style="color: #8892a6; font-size: 0.9em; margin-top: 5px;">Target: 75% | 5 scenarios</p>
+                    </div>
+
+                    <div class="score-item">
+                        <div class="score-item-header">
+                            <span class="score-item-title">Security Audit</span>
+                            <span class="difficulty-badge medium">Medium</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="securityBar" style="width: 0%"></div>
+                        </div>
+                        <p style="color: #8892a6; font-size: 0.9em; margin-top: 5px;">Target: 55% | 5 scenarios</p>
+                    </div>
+
+                    <div class="score-item">
+                        <div class="score-item-header">
+                            <span class="score-item-title">Dependency Update</span>
+                            <span class="difficulty-badge hard">Hard</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="dependencyBar" style="width: 0%"></div>
+                        </div>
+                        <p style="color: #8892a6; font-size: 0.9em; margin-top: 5px;">Target: 35% | 5 scenarios</p>
+                    </div>
+                </div>
+
+                <div class="alert alert-info" style="margin-top: 30px;">
+                    <strong>Grading Engine:</strong> Zero-LLM deterministic scoring using keyword matching and CWE detection. 15 total scenarios across 3 tracks.
+                </div>
+            </div>
+        </div>
+
+        <!-- Architecture Diagram -->
+        <div class="panel">
+            <h2>🏗️ System Architecture</h2>
+            <div class="architecture">
+                <div class="arch-node">
+                    <h3>Agent</h3>
+                    <p>LLM Client</p>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node">
+                    <h3>EnvClient</h3>
+                    <p>HTTP/WS</p>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node">
+                    <h3>FastAPI</h3>
+                    <p>Server</p>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node">
+                    <h3>Graders</h3>
+                    <p>Scoring</p>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-node">
+                    <h3>Reward</h3>
+                    <p>Feedback</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <h3 style="color: #00d4ff; margin-bottom: 15px;">Tech Stack</h3>
+            <div class="tech-stack">
+                <div class="tech-item">Python 3.11</div>
+                <div class="tech-item">FastAPI</div>
+                <div class="tech-item">Pydantic v2</div>
+                <div class="tech-item">Docker</div>
+                <div class="tech-item">HuggingFace Spaces</div>
+                <div class="tech-item">Groq API</div>
+            </div>
+            <p style="margin-top: 20px; color: #8892a6;">
+                Built for META x Scaler Hackathon 2026 | 
+                <a href="https://github.com/Arnav112-l/codeguardian-ai-" style="color: #00d4ff;" target="_blank">GitHub Repository</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://zeus1205-codeguardian-ai.hf.space';
+        let currentTask = 'task_triage';
+        let currentScenario = null;
+
+        // Sample actions for baseline demo
+        const SAMPLE_ACTIONS = {
+            task_triage: {
+                category: "bug",
+                severity: "high",
+                assignee: "backend-oncall",
+                decision: "continue"
+            },
+            task_security_audit: {
+                findings: [
+                    {
+                        cwe_id: "CWE-89",
+                        line_number: 42,
+                        severity: "critical",
+                        fix_description: "Use parameterized queries instead of string concatenation to prevent SQL injection attacks."
+                    }
+                ]
+            },
+            task_dependency_update: {
+                updates: [
+                    {
+                        package: "requests",
+                        from_version: "2.25.1",
+                        to_version: "2.32.3",
+                        is_breaking: false,
+                        migration_notes: "Update to latest stable version with security patches. No breaking changes expected."
+                    }
+                ]
+            }
+        };
+
+        // Check backend health on load
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    document.getElementById('statusDot').style.background = '#00ff88';
+                    document.getElementById('statusText').textContent = 'Backend Online';
+                } else {
+                    throw new Error('Invalid response');
+                }
+            } catch (error) {
+                document.getElementById('statusDot').style.background = '#ff4444';
+                document.getElementById('statusText').textContent = 'Backend Offline';
+                console.error('Health check failed:', error);
+            }
+        }
+
+        // Start a new episode
+        async function startEpisode() {
+            currentTask = document.getElementById('taskType').value;
+            showLoading(true);
+            hideResult();
+
+            try {
+                const response = await fetch(`${API_BASE}/reset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) throw new Error('Reset failed');
+
+                const data = await response.json();
+                
+                // Get state to retrieve scenario
+                const stateResponse = await fetch(`${API_BASE}/state`);
+                const state = await stateResponse.json();
+                
+                // Show scenario
+                document.getElementById('scenarioDisplay').classList.remove('hidden');
+                document.getElementById('scenarioText').textContent = 
+                    `Task: ${currentTask}\n\nScenarios loaded: ${data.total_scenarios}\nEpisode ID: ${state.episode_id}\n\nReady to receive agent action!`;
+                
+                // Show action panel with empty input
+                document.getElementById('actionPanel').classList.remove('hidden');
+                document.getElementById('actionInput').value = '';
+                
+                currentScenario = data;
+                showLoading(false);
+                
+            } catch (error) {
+                showLoading(false);
+                showError('Failed to start episode. Check CORS or backend status.');
+                console.error('Start episode error:', error);
+            }
+        }
+
+        // Run baseline with pre-filled action
+        async function runBaseline() {
+            currentTask = document.getElementById('taskType').value;
+            showLoading(true);
+            hideResult();
+
+            try {
+                // First reset
+                await fetch(`${API_BASE}/reset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                // Pre-fill action
+                const sampleAction = SAMPLE_ACTIONS[currentTask];
+                document.getElementById('actionInput').value = JSON.stringify(sampleAction, null, 2);
+                
+                // Show scenario
+                document.getElementById('scenarioDisplay').classList.remove('hidden');
+                document.getElementById('scenarioText').textContent = 
+                    `Task: ${currentTask}\n\nBaseline demo ready!\n\nSample action pre-filled below. Click "Submit Action" to see grading in action.`;
+                
+                document.getElementById('actionPanel').classList.remove('hidden');
+                showLoading(false);
+                
+            } catch (error) {
+                showLoading(false);
+                showError('Failed to load baseline. Check backend.');
+                console.error('Baseline error:', error);
+            }
+        }
+
+        // Submit action
+        async function submitAction() {
+            const actionText = document.getElementById('actionInput').value.trim();
+            
+            if (!actionText) {
+                showError('Please enter an action JSON');
+                return;
+            }
+
+            showLoading(true);
+            hideResult();
+
+            try {
+                const action = JSON.parse(actionText);
+                
+                const response = await fetch(`${API_BASE}/step`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(action)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Step failed');
+                }
+
+                const result = await response.json();
+                showResult(result);
+                updateScoreBars(result.reward);
+                showLoading(false);
+                
+            } catch (error) {
+                showLoading(false);
+                showError(`Submission failed: ${error.message}`);
+                console.error('Submit error:', error);
+            }
+        }
+
+        // Show result
+        function showResult(result) {
+            const resultDiv = document.getElementById('resultDisplay');
+            resultDiv.classList.remove('hidden');
+            
+            const score = (result.reward.total_score * 100).toFixed(1);
+            
+            resultDiv.innerHTML = `
+                <div class="score-display">
+                    <div class="score-value">${score}%</div>
+                    <div class="score-label">Total Score</div>
+                </div>
+                <div class="alert alert-success">
+                    <strong>Grading Complete!</strong><br>
+                    Sub-scores: ${JSON.stringify(result.reward.sub_scores, null, 2)}
+                </div>
+            `;
+        }
+
+        // Update score bars with animation
+        function updateScoreBars(reward) {
+            const score = reward.total_score * 100;
+            const taskType = currentTask;
+            
+            if (taskType === 'task_triage') {
+                document.getElementById('triageBar').style.width = score + '%';
+            } else if (taskType === 'task_security_audit') {
+                document.getElementById('securityBar').style.width = score + '%';
+            } else if (taskType === 'task_dependency_update') {
+                document.getElementById('dependencyBar').style.width = score + '%';
+            }
+        }
+
+        // Helper functions
+        function showLoading(show) {
+            document.getElementById('loadingSpinner').classList.toggle('hidden', !show);
+            document.getElementById('startBtn').disabled = show;
+            document.getElementById('baselineBtn').disabled = show;
+            document.getElementById('submitBtn').disabled = show;
+        }
+
+        function hideResult() {
+            document.getElementById('resultDisplay').classList.add('hidden');
+        }
+
+        function showError(message) {
+            const resultDiv = document.getElementById('resultDisplay');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `<div class="alert alert-error"><strong>Error:</strong> ${message}</div>`;
+        }
+
+        // Initialize
+        checkHealth();
+        setInterval(checkHealth, 30000); // Check every 30s
+    </script>
+</body>
+</html>
