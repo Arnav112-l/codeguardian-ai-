@@ -68,8 +68,7 @@ class StepRequest(BaseModel):
 async def health():
     return {"status": "ok"}
 
-@app.post("/reset")
-@app.get("/reset")
+@app.api_route("/reset", methods=["GET", "POST"])
 async def reset():
     global _state
     _state = EnvState()
