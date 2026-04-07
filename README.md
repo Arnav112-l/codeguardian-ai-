@@ -18,6 +18,12 @@ Built for the META HACKATHON — grades agents across three tracks: Issue Triage
 
 ---
 
+## Motivation
+
+Open-source maintainers face overwhelming workloads: triaging issues, auditing security vulnerabilities, and managing dependency upgrades. This environment benchmarks AI agents on these real-world tasks using deterministic graders with partial-credit scoring (0.0–1.0 range), enabling reproducible evaluation of LLM-powered developer tools.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -45,7 +51,7 @@ docker run -p 7860:7860 optimaintainer
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/reset` | Reset environment for a new episode |
+| `GET/POST` | `/reset` | Reset environment for a new episode |
 | `POST` | `/step` | Submit an action, receive graded observation |
 | `GET` | `/health` | Health check → `{"status": "ok"}` |
 | `GET` | `/scenarios` | List all 15 scenarios with context |
