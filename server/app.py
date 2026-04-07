@@ -35,7 +35,25 @@ SCENARIOS = _load_scenarios()
 SCENARIO_MAP = {s["id"]: s for s in SCENARIOS}
 
 # --- APP ---
-app = FastAPI(title="OptiMaintainer")
+app = FastAPI(title="CodeGuardian AI - OpenEnv Environment")
+
+@app.get("/")
+def root():
+    return {
+        "name": "CodeGuardian AI OpenEnv Environment",
+        "status": "running",
+        "version": "1.0.0",
+        "available_endpoints": [
+            "GET /",
+            "GET /reset",
+            "GET /state", 
+            "POST /step",
+            "GET /health",
+            "GET /demo",
+            "GET /docs"
+        ],
+        "docs": "/docs"
+    }
 
 @app.get("/demo")
 def demo():
