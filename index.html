@@ -59,6 +59,22 @@
             display: none !important;
         }
 
+        /* Live indicator dot */
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            display: inline-block;
+            animation: live-pulse 1.5s ease-in-out infinite;
+            box-shadow: 0 0 6px #00ff88;
+        }
+
+        @keyframes live-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
         /* --- LANDING PAGE --- */
         #landing {
             position: relative;
@@ -1116,26 +1132,26 @@
                 <div class="stats-grid">
                     <div class="stat-card">
                         <span class="label">Total Runs</span>
-                        <span class="value">124</span>
-                        <span class="trend pos">+12% this week</span>
+                        <span class="value" id="stat-total-runs">0</span>
+                        <span class="trend pos" id="stat-runs-trend">Loading...</span>
                         <div class="icon-placeholder"><i data-lucide="line-chart"></i></div>
                     </div>
                     <div class="stat-card">
                         <span class="label">Active Agents</span>
-                        <span class="value">3</span>
-                        <span class="trend">3 new today</span>
+                        <span class="value" id="stat-active-agents">1</span>
+                        <span class="trend" id="stat-agents-trend">You</span>
                         <div class="icon-placeholder"><i data-lucide="users"></i></div>
                     </div>
                     <div class="stat-card">
                         <span class="label">Scenarios</span>
-                        <span class="value">15</span>
-                        <span class="trend">All systems nominal</span>
+                        <span class="value" id="stat-scenarios">--</span>
+                        <span class="trend" id="stat-scenarios-trend">Loading...</span>
                         <div class="icon-placeholder"><i data-lucide="code-2"></i></div>
                     </div>
                     <div class="stat-card">
                         <span class="label">Global Pass Rate</span>
-                        <span class="value">89.0%</span>
-                        <span class="trend" style="color: #ef4444;">-2.1% from last week</span>
+                        <span class="value" id="stat-pass-rate">--%</span>
+                        <span class="trend" id="stat-pass-trend">No data yet</span>
                         <div class="icon-placeholder"><i data-lucide="check-circle-2"></i></div>
                     </div>
                 </div>
@@ -1144,7 +1160,9 @@
                     <div class="card">
                         <div class="card-header">
                             <h2>Scenario Performance</h2>
-                            <span style="font-size: 0.7rem; color: var(--primary); border: 1px solid var(--primary); padding: 2px 8px; border-radius: 4px;">REALTIME</span>
+                            <span style="font-size: 0.7rem; color: var(--primary); border: 1px solid var(--primary); padding: 2px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px;">
+                                <span class="live-dot"></span>REALTIME
+                            </span>
                         </div>
                         <p style="color: var(--text-dim); margin-bottom: 24px;">Average success rate across domain categories</p>
                         
@@ -1225,7 +1243,7 @@
                                 <th>Date</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="execution-logs-body">
                             <tr>
                                 <td><span class="status-pill fail"><i data-lucide="x-circle"></i> FAIL</span></td>
                                 <td style="font-weight: 600;">Gemini-1.5-Pro</td>
@@ -1419,10 +1437,158 @@
         const API_BASE = 'https://zeus1205-codeguardian-ai.hf.space';
         let currentTask = 'task_triage';
 
-        // Navigation
+        // ============================================================================
+        // LOCAL STORAGE TRACKING
+        // ============================================================================
+        const STORAGE_KEY = 'codeguardian_stats';
+
+        function getStoredStats() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                if (data) return JSON.parse(data);
+            } catch (e) {}
+            return { totalRuns: 0, passes: 0, fails: 0, history: [] };
+        }
+
+        function saveStats(stats) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+        }
+
+        function recordRun(taskType, score, passed) {
+            const stats = getStoredStats();
+            stats.totalRuns++;
+            if (passed) stats.passes++;
+            else stats.fails++;
+            
+            // Add to history (keep last 50)
+            stats.history.unshift({
+                taskType,
+                score,
+                passed,
+                timestamp: new Date().toISOString(),
+                agent: 'You'
+            });
+            if (stats.history.length > 50) stats.history = stats.history.slice(0, 50);
+            
+            saveStats(stats);
+            updateDashboardStats();
+            addLogEntry(taskType, score, passed);
+        }
+
+        // ============================================================================
+        // DASHBOARD STATS (LIVE)
+        // ============================================================================
+        async function fetchDashboardStats() {
+            // Get local stats
+            const stats = getStoredStats();
+            
+            // Update Total Runs
+            document.getElementById('stat-total-runs').textContent = stats.totalRuns;
+            document.getElementById('stat-runs-trend').textContent = stats.totalRuns > 0 ? 
+                `${stats.history.filter(h => isToday(h.timestamp)).length} today` : 'Start running!';
+            
+            // Update Active Agents
+            document.getElementById('stat-active-agents').textContent = '1';
+            document.getElementById('stat-agents-trend').textContent = 'You';
+            
+            // Update Pass Rate
+            if (stats.totalRuns > 0) {
+                const passRate = ((stats.passes / stats.totalRuns) * 100).toFixed(1);
+                document.getElementById('stat-pass-rate').textContent = passRate + '%';
+                const trend = passRate >= 50 ? 'pos' : '';
+                document.getElementById('stat-pass-trend').textContent = `${stats.passes}/${stats.totalRuns} passed`;
+                document.getElementById('stat-pass-trend').className = 'trend ' + trend;
+            }
+            
+            // Fetch scenarios from backend
+            try {
+                const resp = await fetch(`${API_BASE}/scenarios`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const total = data.total || (data.scenarios ? data.scenarios.length : 15);
+                    document.getElementById('stat-scenarios').textContent = total;
+                    document.getElementById('stat-scenarios-trend').textContent = 'All systems nominal';
+                    document.getElementById('stat-scenarios-trend').className = 'trend';
+                }
+            } catch (e) {
+                document.getElementById('stat-scenarios').textContent = '15';
+                document.getElementById('stat-scenarios-trend').textContent = 'Backend offline';
+                document.getElementById('stat-scenarios-trend').style.color = '#ef4444';
+            }
+        }
+
+        function updateDashboardStats() {
+            fetchDashboardStats();
+        }
+
+        function isToday(dateStr) {
+            const date = new Date(dateStr);
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        // ============================================================================
+        // EXECUTION LOGS TABLE
+        // ============================================================================
+        function addLogEntry(taskType, score, passed) {
+            const tbody = document.getElementById('execution-logs-body');
+            if (!tbody) return;
+            
+            const now = new Date();
+            const timeStr = now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            
+            const taskNames = {
+                'task_triage': 'Issue Triage',
+                'task_security_audit': 'Security Audit',
+                'task_dependency_update': 'Dependency Update'
+            };
+            const taskColors = {
+                'task_triage': 'var(--neon-cyan)',
+                'task_security_audit': 'var(--neon-magenta)',
+                'task_dependency_update': 'var(--neon-orange)'
+            };
+            const taskIcons = {
+                'task_triage': 'alert-triangle',
+                'task_security_audit': 'shield',
+                'task_dependency_update': 'refresh-cw'
+            };
+            const difficulties = {
+                'task_triage': ['easy', 'Easy'],
+                'task_security_audit': ['medium', 'Medium'],
+                'task_dependency_update': ['hard', 'Hard']
+            };
+            
+            const taskName = taskNames[taskType] || taskType;
+            const taskColor = taskColors[taskType] || 'var(--primary)';
+            const taskIcon = taskIcons[taskType] || 'code';
+            const [diffClass, diffLabel] = difficulties[taskType] || ['easy', 'Easy'];
+            const scorePercent = Math.round(score * 100);
+            const scoreClass = scorePercent >= 70 ? 'high' : scorePercent >= 40 ? 'mid' : 'low';
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="status-pill ${passed ? 'pass' : 'fail'}"><i data-lucide="${passed ? 'check-circle-2' : 'x-circle'}"></i> ${passed ? 'PASS' : 'FAIL'}</span></td>
+                <td style="font-weight: 600; ${passed ? 'color: var(--neon-cyan);' : ''}">You</td>
+                <td><span style="color: ${taskColor}; display: flex; align-items: center; gap: 8px;"><i data-lucide="${taskIcon}" style="width: 14px;"></i> ${taskName}</span></td>
+                <td><span class="difficulty ${diffClass}">${diffLabel}</span></td>
+                <td><span class="score-text ${scoreClass}">${scorePercent}</span><span style="color: var(--text-dim);">/100</span></td>
+                <td style="color: var(--text-dim); font-size: 0.8rem;">${timeStr}</td>
+            `;
+            
+            // Prepend to table
+            tbody.insertBefore(tr, tbody.firstChild);
+            
+            // Re-init lucide icons for new row
+            lucide.createIcons();
+        }
+
+        // ============================================================================
+        // NAVIGATION
+        // ============================================================================
         function enterApp() {
             document.getElementById('landing').classList.add('hidden');
             document.getElementById('dashboard').classList.remove('hidden');
+            fetchDashboardStats();
         }
 
         function exitApp() {
@@ -1447,7 +1613,9 @@
             });
         }
 
-        // Logic from previous version
+        // ============================================================================
+        // EPISODE LOGIC
+        // ============================================================================
         async function startEpisode() {
             currentTask = document.getElementById('taskType').value;
             const initBtn = document.getElementById('initBtn');
@@ -1500,6 +1668,12 @@
                 });
                 const result = await response.json();
                 showResult(result);
+                
+                // Record this run in localStorage
+                const score = result.total_score || 0;
+                const passed = score >= 0.5;
+                recordRun(currentTask, score, passed);
+                
                 submitBtn.disabled = false;
             } catch (error) {
                 alert('Submission failed: ' + error.message);
@@ -1540,6 +1714,15 @@
             const sampleAction = SAMPLE_ACTIONS[currentTask];
             document.getElementById('actionInput').value = JSON.stringify(sampleAction, null, 2);
         }
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+        // Fetch stats on page load
+        fetchDashboardStats();
+        
+        // Refresh stats every 10 seconds
+        setInterval(fetchDashboardStats, 10000);
 
     </script>
 </body>
