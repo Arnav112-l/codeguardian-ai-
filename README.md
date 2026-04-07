@@ -10,27 +10,76 @@ tags:
   - openenv
 ---
 
-# 🔧 OptiMaintainer
+<div align="center">
 
-**Production-grade OpenEnv environment for grading AI agents on open-source repository maintenance.**
+# 🛡️ CodeGuardian AI
 
-Built for the META HACKATHON — grades agents across three tracks: Issue Triage, Security Audit, and Dependency Management.
+### Production-Grade OpenEnv Environment for AI Agent Evaluation
+
+[![OpenEnv](https://img.shields.io/badge/OpenEnv-Compatible-brightgreen)](https://openenv.dev)
+[![HuggingFace Spaces](https://img.shields.io/badge/🤗%20HuggingFace-Spaces-blue)](https://huggingface.co/spaces/zeus1205/codeguardian-ai)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg)](https://fastapi.tiangolo.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Benchmark AI agents on real-world open-source maintenance tasks:**  
+**Issue Triage • Security Auditing • Dependency Management**
+
+[🚀 Live Demo](https://zeus1205-codeguardian-ai.hf.space) • [📖 API Docs](https://zeus1205-codeguardian-ai.hf.space/docs) • [🎮 Interactive Playground](https://zeus1205-codeguardian-ai.hf.space/demo)
+
+</div>
 
 ---
 
-## Motivation
+## 🎯 Overview
 
-Open-source maintainers face overwhelming workloads: triaging issues, auditing security vulnerabilities, and managing dependency upgrades. This environment benchmarks AI agents on these real-world tasks using deterministic graders with partial-credit scoring (0.0–1.0 range), enabling reproducible evaluation of LLM-powered developer tools.
+**CodeGuardian AI** is an OpenEnv-compliant evaluation environment that benchmarks LLM-powered coding agents on three critical open-source maintenance tasks. It provides deterministic grading with partial-credit scoring, enabling reproducible and fair comparisons between AI systems.
+
+### Why CodeGuardian AI?
+
+Open-source maintainers are overwhelmed with:
+- 📋 **Hundreds of issues** requiring accurate triage and routing
+- 🔒 **Security vulnerabilities** hidden in codebases  
+- 📦 **Dependency updates** with complex breaking changes
+
+This environment tests whether AI agents can reliably assist with these tasks, using real-world scenarios from PyTorch and HuggingFace ecosystems.
 
 ---
 
-## Quick Start
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| **🎯 3 Task Tracks** | Triage, Security Audit, Dependency Management |
+| **📊 15 Scenarios** | 5 scenarios per track, covering edge cases |
+| **⚖️ Partial Credit** | Scores from 0.0 to 1.0 with nuanced grading |
+| **🔄 Deterministic** | Zero-LLM grading logic for reproducibility |
+| **🐳 Docker Ready** | One-command deployment with health checks |
+| **🌐 OpenEnv Spec** | Full compliance with hackathon requirements |
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Use Live API
 
 ```bash
+# Test the live environment
+curl https://zeus1205-codeguardian-ai.hf.space/reset
+curl https://zeus1205-codeguardian-ai.hf.space/state
+```
+
+### Option 2: Run Locally
+
+```bash
+# Clone repository
+git clone https://github.com/Arnav112-l/codeguardian-ai-.git
+cd codeguardian-ai-
+
 # Install dependencies
 pip install -r requirements.txt
 
-# Start the server
+# Start server
 uvicorn server.app:app --host 0.0.0.0 --port 7860
 
 # Verify
@@ -38,216 +87,281 @@ curl http://localhost:7860/health
 # → {"status": "ok"}
 ```
 
-### Docker
+### Option 3: Docker
 
 ```bash
-docker build -t optimaintainer .
-docker run -p 7860:7860 optimaintainer
+docker build -t codeguardian-ai .
+docker run -p 7860:7860 codeguardian-ai
 ```
 
 ---
 
-## API Endpoints
+## 📡 API Reference
+
+### Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET/POST` | `/reset` | Reset environment for a new episode |
-| `POST` | `/step` | Submit an action, receive graded observation |
-| `GET` | `/health` | Health check → `{"status": "ok"}` |
-| `GET` | `/scenarios` | List all 15 scenarios with context |
-| `GET` | `/state` | Current episode progress & scores |
+| `GET` | `/` | Environment info and available endpoints |
+| `GET/POST` | `/reset` | Reset environment for new episode |
+| `GET` | `/state` | Current episode progress and scores |
+| `POST` | `/step` | Submit action, receive graded observation |
+| `GET` | `/health` | Health check |
+| `GET` | `/demo` | Interactive web interface |
+| `GET` | `/docs` | OpenAPI documentation |
+
+### Example: Complete Episode Flow
+
+```python
+import httpx
+
+BASE_URL = "https://zeus1205-codeguardian-ai.hf.space"
+
+# 1. Reset environment
+reset = httpx.get(f"{BASE_URL}/reset").json()
+print(f"Scenarios: {reset['scenario_ids']}")
+
+# 2. Submit action
+action = {
+    "action_type": "triage",
+    "scenario_id": "triage-001",
+    "payload": {
+        "category": "bug",
+        "severity": "high",
+        "assignee": "oncall:distributed",
+        "decision": "stop"
+    }
+}
+result = httpx.post(f"{BASE_URL}/step", json=action).json()
+print(f"Score: {result['total_score']}")  # → 1.0
+
+# 3. Check state
+state = httpx.get(f"{BASE_URL}/state").json()
+print(f"Completed: {state['step_count']}/15")
+```
 
 ---
 
-## Action Space
+## 🎮 Task Tracks
 
-Agents interact with the environment by sending `POST /step` with the following action types:
-
-### 1. Triage (`action_type: "triage"`)
-
-Classify and route repository issues.
+### 1. Issue Triage (Easy)
+Classify and route repository issues to appropriate teams.
 
 ```json
 {
   "action_type": "triage",
   "scenario_id": "triage-001",
   "payload": {
-    "category": "bug",
-    "severity": "high",
+    "category": "bug",           // bug | feature | docs | question | performance
+    "severity": "high",          // low | medium | high | critical
     "assignee": "oncall:distributed",
-    "decision": "stop"
+    "decision": "stop"           // stop | continue
   }
 }
 ```
 
-| Field | Type | Values |
-|-------|------|--------|
-| `category` | string | `"bug"`, `"feature"`, `"performance"`, `"documentation"` |
-| `severity` | enum | `"low"`, `"medium"`, `"high"`, `"critical"` |
-| `assignee` | string | oncall identifier (e.g., `"oncall:distributed"`) |
-| `decision` | enum | `"stop"` (escalation halts) or `"continue"` (escalation proceeds) |
+**Scoring:**
+- Category: 1.0 exact, 0.0 wrong
+- Severity: 1.0 exact, 0.5 adjacent, 0.0 otherwise
+- Routing: 1.0 exact, 0.5 correct domain
+- Decision: 1.0 correct, 0.0 wrong
 
-### 2. Security Audit (`action_type: "security"`)
-
-Detect vulnerabilities in code snippets.
+### 2. Security Audit (Medium)
+Detect CWE vulnerabilities in Python code snippets.
 
 ```json
 {
   "action_type": "security",
   "scenario_id": "security-001",
   "payload": {
-    "findings": [
-      {
-        "cwe_id": "CWE-89",
-        "line_number": 2,
-        "fix_description": "Use parameterized queries with bound parameters"
-      }
-    ]
+    "findings": [{
+      "cwe_id": "CWE-89",
+      "line_number": 2,
+      "severity": "critical",
+      "fix_description": "Use parameterized queries"
+    }]
   }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `findings[].cwe_id` | string | CWE identifier (e.g., `"CWE-89"`) |
-| `findings[].line_number` | int | Source line of the vulnerability (≥1) |
-| `findings[].fix_description` | string | Recommended remediation |
+**Scoring:**
+- Base: 0.6 for correct CWE + line (±2)
+- Bonus: +0.4 for relevant fix keywords
+- Penalty: 0.7x if critical vuln missed
+- FP Penalty: -0.05 per false positive (max -0.2)
 
-### 3. Dependency Update (`action_type: "dependency"`)
-
-Propose package version updates with migration analysis.
+### 3. Dependency Update (Hard)
+Recommend safe package upgrades with migration plans.
 
 ```json
 {
   "action_type": "dependency",
   "scenario_id": "dependency-001",
   "payload": {
-    "updates": [
-      {
-        "package": "numpy",
-        "from_version": "1.24.4",
-        "to_version": "2.0.0",
-        "is_breaking": true,
-        "migration_notes": "The deprecated API functions have been removed. int64 is now the default dtype. numpy.distutils has been removed in favor of meson."
-      }
-    ]
+    "updates": [{
+      "package": "numpy",
+      "from_version": "1.24.4",
+      "to_version": "2.0.0",
+      "is_breaking": true,
+      "migration_notes": "int64 default dtype, distutils removed"
+    }]
   }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `updates[].package` | string | Package name |
-| `updates[].from_version` | string | Current version |
-| `updates[].to_version` | string | Target version |
-| `updates[].is_breaking` | bool | Whether the update has breaking changes |
-| `updates[].migration_notes` | string | Free-text migration instructions |
+**Scoring:**
+- Version: 0.2 weight (exact match)
+- Breaking: 0.4 weight (correct flag)
+- Migration: 0.4 weight (keyword overlap)
 
 ---
 
-## Observation Space
+## 📊 Scenario Bank
 
-Every `/step` call returns a structured **Observation**:
+15 curated scenarios from real PyTorch/HuggingFace maintenance:
 
-```json
-{
-  "scenario_id": "triage-001",
-  "action_type": "triage",
-  "total_score": 0.875,
-  "sub_scores": [
-    {"name": "category", "score": 1.0, "feedback": "Correct category: 'bug'"},
-    {"name": "severity", "score": 0.5, "feedback": "Severity one level off (expected medium, got high)"},
-    {"name": "routing", "score": 1.0, "feedback": "Exact assignee match: oncall:distributed"},
-    {"name": "decision", "score": 1.0, "feedback": "Correct decision: stop"}
-  ],
-  "feedback": "[category] Correct | [severity] One level off | [routing] Exact | [decision] Correct",
-  "done": false
-}
+| Track | Count | Examples |
+|-------|-------|----------|
+| **Triage** | 5 | DDP memory leak, torch.compile feature, checkpoint corruption |
+| **Security** | 5 | SQL injection, XSS, pickle deserialization, path traversal, SSRF |
+| **Dependency** | 5 | NumPy 2.0, Pydantic v2, Flask 3.0, transformers 4.40 |
+
+---
+
+## 📈 Baseline Scores
+
+Random agent performance (baseline):
+
+| Task | Avg Score | Target |
+|------|-----------|--------|
+| Triage | 0.38 | 0.75 |
+| Security Audit | 0.20 | 0.55 |
+| Dependency Update | 0.30 | 0.35 |
+
+Run baseline yourself:
+```bash
+python inference.py --mock
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `total_score` | float | Overall score [0.0, 1.0] |
-| `sub_scores` | array | Breakdown by grading dimension |
-| `feedback` | string | Human-readable explanation |
-| `done` | bool | `true` when all 15 scenarios are complete |
-
 ---
 
-## Scoring Formulas
-### Triage (avg of Cat, Sev, Routing)
-- **Category**: 1.0 exact, 0.0 wrong
-- **Severity**: 1.0 exact, 0.5 adjacent, 0.0 otherwise (ordinal: low=0, medium=1, high=2, critical=3)
-- **Routing**: 1.0 exact assignee, 0.5 correct domain, 0.0 wrong
-- **Decision**: 1.0 correct, 0.0 wrong (logged as sub-score but not in total average)
-
-### Security (0.6 Base + 0.4 Quality)
-- **Match**: CWE must match exactly and line within ±2 range.
-- **Scoring**: 0.6 base for match + 0.4 bonus for keyword overlap in fix description.
-- **Penalty**: 0.7x multiplier applied if a CRITICAL or BLOCKER vulnerability is missed.
-- **False Positives**: -0.05 deduction per reported finding that is not in ground truth (max -0.2).
-
-### Dependency Updater
-- **Version**: 0.2 weight (exact version match)
-- **Breaking Recall**: 0.4 weight (flagging breaking changes)
-- **Migration Quality**: 0.4 weight (keyword overlap against reference)
-- **Zero-LLM Loop**: Grading uses purely programmatic string/keyword logic.
-
----
-
-## Scenario Bank
-
-15 scenarios (5 per track) stored in `scenario_bank.json`, covering real-world PyTorch/HuggingFace maintenance tasks:
-
-| Track | Scenarios | Examples |
-|-------|-----------|----------|
-| Triage | 5 | DDP memory leak, torch.compile feature request, checkpoint corruption |
-| Security | 5 | SQL injection, XSS, unsafe deserialization, path traversal, SSRF |
-| Dependency | 5 | NumPy 2.0, Pydantic v2, Flask 3.0, requests patch, transformers 4.40 |
-
----
-
-## Project Structure
+## 🏗️ Project Structure
 
 ```
-Meta/
-├── models.py              # Pydantic schemas (Action, Observation)
-├── scenario_bank.json     # 15 test scenarios with reference answers
-├── requirements.txt       # Pinned dependencies (== only)
-├── Dockerfile             # python:3.11-slim, curl HEALTHCHECK
-├── .dockerignore
+codeguardian-ai/
 ├── server/
-│   ├── __init__.py
-│   ├── app.py             # FastAPI: /reset, /step, /health
-│   ├── triage_grader.py   # Issue classification grader
-│   ├── security_grader.py # Vulnerability detection grader
-│   └── dependency_grader.py # Package update grader
-├── test_audit.py          # Comprehensive rubric compliance tests
-├── validate.py            # Quick validation script
+│   ├── app.py              # FastAPI application
+│   └── __init__.py
+├── graders/
+│   └── __init__.py         # Grader exports
+├── tasks/
+│   └── __init__.py         # Task registry
+├── tests/
+│   └── test_models.py      # Unit tests
+├── models.py               # Pydantic schemas
+├── graders.py              # Deterministic grading logic
+├── environment.py          # Environment state management
+├── inference.py            # OpenEnv inference script
+├── scenario_bank.json      # 15 test scenarios
+├── openenv.yaml            # OpenEnv configuration
+├── Dockerfile              # Container definition
+├── requirements.txt        # Python dependencies
 └── README.md
 ```
 
 ---
 
-## Running the Audit
+## 🔧 Configuration
 
-```bash
-# Start server
-uvicorn server.app:app --host 0.0.0.0 --port 7860
+### Environment Variables
 
-# In another terminal
-python test_audit.py
-# → 🏆 100% COMPLIANCE — READY FOR SUBMISSION
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `API_BASE_URL` | LLM API endpoint | `https://router.huggingface.co/v1` |
+| `MODEL_NAME` | Model identifier | `Qwen/Qwen2.5-72B-Instruct` |
+| `HF_TOKEN` | HuggingFace API token | Required for live runs |
+| `OPENENV_URL` | Grading server URL | `https://zeus1205-codeguardian-ai.hf.space` |
+
+### OpenEnv Configuration (`openenv.yaml`)
+
+```yaml
+name: "codeguardian-ai"
+version: "1.0.0"
+type: coding_env
+runtime: docker
+app_port: 7860
+reward_range: [0.0, 1.0]
+tags: [openenv, coding, security, devtools]
 ```
 
 ---
 
-## Baseline Scores
+## 🧪 Testing
 
-| Task | Avg Score | Scenarios |
-|------|-----------|-----------|
-| Triage | 0.38 | 5 |
-| Security Audit | 0.20 | 5 |
-| Dependency Update | 0.30 | 5 |
+```bash
+# Run unit tests
+pytest tests/
 
-*Scores generated with `python inference.py --mock` using random baseline agent.*
+# Run audit compliance
+python test_audit.py
+
+# Run integration tests
+python test_integration.py
+```
+
+---
+
+## 📦 Deployment
+
+### HuggingFace Spaces
+
+The environment is deployed at:  
+**https://zeus1205-codeguardian-ai.hf.space**
+
+### Self-Hosted
+
+```bash
+# Build and run
+docker build -t codeguardian-ai .
+docker run -d -p 7860:7860 --name codeguardian codeguardian-ai
+
+# Verify
+curl http://localhost:7860/health
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **META x Scaler Hackathon** - Competition framework
+- **OpenEnv** - Evaluation specification
+- **HuggingFace** - Hosting infrastructure
+- **FastAPI** - API framework
+
+---
+
+<div align="center">
+
+**Built with ❤️ for the AI Agent Evaluation Community**
+
+[⭐ Star this repo](https://github.com/Arnav112-l/codeguardian-ai-) if you find it useful!
+
+</div>
