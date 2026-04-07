@@ -1,242 +1,300 @@
+#!/usr/bin/env python3
+"""
+CodeGuardian AI - Inference Script for OpenEnv Hackathon Submission
+
+This script runs all 15 scenarios (5 triage, 5 security, 5 dependency) using
+OpenAI-compatible API via HuggingFace router.
+
+Required Environment Variables:
+    API_BASE_URL: API endpoint (default: https://router.huggingface.co/v1)
+    MODEL_NAME: Model to use (default: Qwen/Qwen2.5-72B-Instruct)
+    HF_TOKEN: HuggingFace API token (required for live runs)
+    OPENENV_URL: OpenEnv grading server (default: https://zeus1205-codeguardian-ai.hf.space)
+
+Output Format (mandatory for hackathon):
+    [START] task=<task_name> env=codeguardian model=<MODEL_NAME>
+    [STEP] step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<null|msg>
+    [END] success=<true|false> steps=<n> score=<0.00> rewards=<r1,r2,...>
+"""
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import random
 import sys
 import time
-from collections import defaultdict
 from typing import Any
 
-from environment import CodingEnvironment
-from models import Action, DependencyAction, SecurityAuditAction, TriageAction, model_validate_action
+import httpx
 
 try:
-    from groq import Groq
-except Exception:  # pragma: no cover - handled at runtime for mock-only workflows
-    Groq = None  # type: ignore[assignment]
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None  # type: ignore[assignment, misc]
 
+# ============================================================================
+# ENVIRONMENT CONFIGURATION
+# ============================================================================
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+OPENENV_URL = os.getenv("OPENENV_URL", "https://zeus1205-codeguardian-ai.hf.space")
 
-TASKS = ["task_triage", "task_security_audit", "task_dependency_update"]
-TARGET_SCORES = {
-    "task_triage": 0.75,
-    "task_security_audit": 0.55,
-    "task_dependency_update": 0.35,
+# Scenario definitions: 15 total (5 per task type)
+SCENARIOS = {
+    "triage": [f"triage-{i:03d}" for i in range(1, 6)],
+    "security": [f"security-{i:03d}" for i in range(1, 6)],
+    "dependency": [f"dependency-{i:03d}" for i in range(1, 6)],
 }
 
+# System prompts for each task type
 SYSTEM_PROMPTS = {
-    "task_triage": (
-        'You are a support ticket triage agent. Analyze the ticket carefully and respond ONLY with valid JSON.\n'
-        'Required format: {"category": "...", "severity": "...", "module_label": "...", "oncall_routing": "..."}\n\n'
-        'CATEGORY (choose exactly one):\n'
-        '- "bug": system errors, crashes, failures, things not working as expected\n'
-        '- "feature": new functionality requests, enhancements, product asks\n'
-        '- "docs": documentation issues, missing guides, unclear instructions\n'
-        '- "question": user asking for information, clarification, how things work\n\n'
-        'SEVERITY (choose exactly one):\n'
-        '- "critical": data loss, security breach, complete outage, double charging\n'
-        '- "high": major functionality broken, significant user impact\n'
-        '- "medium": partial functionality affected, workaround exists\n'
-        '- "low": minor issues, cosmetic, nice-to-have\n\n'
-        'module_label: extract the specific service/module name mentioned (e.g., "auth-service", "payment-gateway", "analytics-ui")\n'
-        'oncall_routing: route to appropriate team based on module (e.g., "backend-oncall", "payments-oncall", "support-oncall", "devrel-oncall", "product-oncall")'
+    "triage": (
+        'You are a support ticket triage agent. Analyze the ticket and respond ONLY with valid JSON.\n'
+        'Required format: {"category": "...", "severity": "...", "assignee": "...", "decision": "..."}\n\n'
+        'CATEGORY: "bug", "feature", "docs", or "question"\n'
+        'SEVERITY: "critical", "high", "medium", or "low"\n'
+        'ASSIGNEE: team routing like "backend-oncall", "payments-oncall", "support-oncall"\n'
+        'DECISION: "continue" or "stop"'
     ),
-    "task_security_audit": (
+    "security": (
         'You are a security auditor. Identify vulnerabilities and respond ONLY with valid JSON.\n'
         'Required format: {"findings": [{"cwe_id": "CWE-XXX", "line_number": N, "severity": "...", "fix_description": "..."}]}\n\n'
-        'Common CWE IDs:\n'
-        '- CWE-79: Cross-site Scripting (XSS) - unescaped HTML output\n'
-        '- CWE-89: SQL Injection - string concatenation in queries\n'
-        '- CWE-502: Deserialization of Untrusted Data - pickle/yaml.load\n'
-        '- CWE-330: Insufficient Randomness - random.random() for security\n'
-        '- CWE-862: Missing Authorization - no role/permission checks\n\n'
-        'line_number: integer line number where the vulnerability exists\n'
-        'severity: "low", "medium", "high", or "critical"\n'
-        'fix_description: specific remediation steps'
+        'Common CWEs: CWE-79 (XSS), CWE-89 (SQLi), CWE-502 (Deserialization), CWE-330 (Weak Random)\n'
+        'SEVERITY: "low", "medium", "high", or "critical"'
     ),
-    "task_dependency_update": (
-        'You are a dependency upgrade advisor. Analyze the current dependency issue and respond ONLY with valid JSON.\n'
-        'Required format: {"updated_version": "package==X.Y.Z", "breaking_changes": ["change1", "change2"], "migration_description": "..."}\n\n'
-        'IMPORTANT GUIDELINES:\n'
-        '- updated_version: Use format "packagename==X.Y.Z" with a recent stable version\n'
-        '  Examples: "requests==2.32.3", "pydantic==2.12.5", "openai==2.30.0", "pytest==9.0.2", "httpx==0.28.1"\n'
-        '- breaking_changes: List specific API/behavior changes developers must address (at least 2 items)\n'
-        '- migration_description: Write a detailed migration plan with specific steps (must be at least 20 characters)\n\n'
-        'Focus on the EXACT package mentioned in the context and recommend appropriate modern version.'
+    "dependency": (
+        'You are a dependency upgrade advisor. Respond ONLY with valid JSON.\n'
+        'Required format: {"updates": [{"package": "...", "from_version": "...", "to_version": "...", "is_breaking": true/false, "migration_notes": "..."}]}\n\n'
+        'Recommend appropriate modern versions with migration guidance.'
     ),
 }
 
 
-def _strip_code_fences(text: str) -> str:
+def strip_code_fences(text: str) -> str:
+    """Remove markdown code fences from LLM response."""
     cleaned = text.strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
-        if lines:
-            lines = lines[1:]
+        lines = lines[1:]  # Remove opening fence
         if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
+            lines = lines[:-1]  # Remove closing fence
         cleaned = "\n".join(lines).strip()
     if cleaned.lower().startswith("json\n"):
         cleaned = cleaned[5:].strip()
     return cleaned
 
 
-def _build_user_prompt(obs: Any) -> str:
-    return (
-        f"Task: {obs.task_id}\n"
-        f"Scenario: {obs.scenario_id}\n"
-        f"Context:\n{obs.context}\n\n"
-        f"Available actions: {obs.available_actions}\n"
-        "Return only JSON matching the required schema."
-    )
+def call_openenv_reset(base_url: str) -> dict[str, Any]:
+    """POST /reset to initialize environment."""
+    with httpx.Client(timeout=30.0) as client:
+        resp = client.post(f"{base_url}/reset")
+        resp.raise_for_status()
+        return resp.json()
 
 
-def _mock_action_for_task(task_id: str) -> Action:
-    if task_id == "task_triage":
-        return TriageAction.model_validate(
-            {
-                "category": random.choice(["bug", "feature", "documentation", "performance"]),
-                "severity": random.choice(["low", "medium", "high", "critical"]),
-                "assignee": random.choice(
-                    ["oncall:distributed", "oncall:pt2", "oncall:serialization", "oncall:docs", "oncall:performance"]
-                ),
-                "decision": random.choice(["stop", "continue"]),
-            }
-        )
-    if task_id == "task_security_audit":
-        return SecurityAuditAction.model_validate(
-            {
-                "findings": [
-                    {
-                        "cwe_id": random.choice(
-                            ["CWE-79", "CWE-89", "CWE-502", "CWE-22", "CWE-918"]
-                        ),
-                        "line_number": random.randint(1, 10),
-                        "severity": random.choice(["low", "medium", "high", "critical"]),
-                        "fix_description": "Use parameterized queries and sanitize user input.",
-                    }
-                ]
-            }
-        )
-    return DependencyAction.model_validate(
-        {
-            "updates": [
-                {
-                    "package": random.choice(["numpy", "pydantic", "flask", "requests", "transformers"]),
-                    "from_version": "1.0.0",
-                    "to_version": random.choice(["2.0.0", "2.5.3", "3.0.0", "2.32.3", "4.40.0"]),
-                    "is_breaking": random.choice([True, False]),
-                    "migration_notes": "Update deprecated APIs, check compatibility, run tests.",
-                }
-            ]
-        }
-    )
+def call_openenv_step(base_url: str, action_type: str, scenario_id: str, payload: dict) -> dict[str, Any]:
+    """POST /step with action payload."""
+    body = {
+        "action_type": action_type,
+        "scenario_id": scenario_id,
+        "payload": payload,
+    }
+    with httpx.Client(timeout=60.0) as client:
+        resp = client.post(f"{base_url}/step", json=body)
+        resp.raise_for_status()
+        return resp.json()
 
 
-def _call_llm_for_action(client: Any, model_name: str, task_id: str, obs: Any) -> tuple[Action, int]:
-    started = time.perf_counter()
+def get_scenario_context(base_url: str, scenario_id: str) -> str:
+    """Get scenario context from /scenarios endpoint."""
+    with httpx.Client(timeout=30.0) as client:
+        resp = client.get(f"{base_url}/scenarios")
+        resp.raise_for_status()
+        scenarios = resp.json()
+        if isinstance(scenarios, dict) and "scenarios" in scenarios:
+            scenarios = scenarios["scenarios"]
+        for s in scenarios:
+            if s.get("id") == scenario_id:
+                return s.get("context", s.get("description", ""))
+        return ""
+
+
+def call_llm(client: Any, task_type: str, context: str) -> dict[str, Any]:
+    """Call LLM to generate action payload."""
+    user_prompt = f"Context:\n{context}\n\nRespond with the required JSON format only."
+    
     response = client.chat.completions.create(
-        model=model_name,
+        model=MODEL_NAME,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPTS[task_id]},
-            {"role": "user", "content": _build_user_prompt(obs)},
+            {"role": "system", "content": SYSTEM_PROMPTS[task_type]},
+            {"role": "user", "content": user_prompt},
         ],
         temperature=0,
+        max_tokens=1024,
     )
-    latency_ms = int((time.perf_counter() - started) * 1000)
-
-    raw = response.choices[0].message.content or ""
-    clean = _strip_code_fences(raw)
-    action_dict = json.loads(clean)
-    action = model_validate_action(action_dict, task_id)
-    return action, latency_ms
+    
+    raw = response.choices[0].message.content or "{}"
+    cleaned = strip_code_fences(raw)
+    return json.loads(cleaned)
 
 
-def _print_score_table(scores_by_task: dict[str, list[float]]) -> None:
-    print("task                  | avg_score | target")
-    print("----------------------|-----------|-------")
-    for task_id in TASKS:
-        scores = scores_by_task.get(task_id, [])
-        avg_score = (sum(scores) / len(scores)) if scores else 0.0
-        print(f"{task_id:<22}|   {avg_score:.2f}    |  {TARGET_SCORES[task_id]:.2f}")
+def run_episode(
+    llm_client: Any,
+    task_type: str,
+    scenario_id: str,
+    mock: bool = False,
+) -> tuple[float, list[float], bool, str | None]:
+    """
+    Run a single episode for one scenario.
+    
+    Returns: (total_score, rewards_list, success, error_message)
+    """
+    rewards: list[float] = []
+    error_msg: str | None = None
+    total_score = 0.0
+    success = False
+    
+    # Print [START] log
+    print(f"[START] task={task_type} env=codeguardian model={MODEL_NAME}")
+    
+    try:
+        # Get scenario context
+        context = get_scenario_context(OPENENV_URL, scenario_id)
+        
+        # Generate action using LLM or mock
+        if mock:
+            if task_type == "triage":
+                payload = {"category": "bug", "severity": "high", "assignee": "backend-oncall", "decision": "continue"}
+            elif task_type == "security":
+                payload = {"findings": [{"cwe_id": "CWE-89", "line_number": 10, "severity": "high", "fix_description": "Use parameterized queries"}]}
+            else:
+                payload = {"updates": [{"package": "requests", "from_version": "2.25.0", "to_version": "2.32.3", "is_breaking": False, "migration_notes": "Update to latest stable version"}]}
+        else:
+            payload = call_llm(llm_client, task_type, context)
+        
+        # Submit action to OpenEnv
+        result = call_openenv_step(OPENENV_URL, task_type, scenario_id, payload)
+        
+        # Extract score
+        total_score = result.get("total_score", 0.0)
+        rewards.append(total_score)
+        done = result.get("done", True)
+        
+        # Print [STEP] log
+        action_str = json.dumps(payload, separators=(",", ":"))
+        print(f"[STEP] step=1 action={action_str} reward={total_score:.2f} done={'true' if done else 'false'} error=null")
+        
+        success = True
+        
+    except Exception as e:
+        error_msg = str(e).replace("\n", " ")[:100]
+        print(f"[STEP] step=1 action={{}} reward=0.00 done=true error={error_msg}")
+        rewards.append(0.0)
+    
+    # Print [END] log
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={'true' if success else 'false'} steps={len(rewards)} score={total_score:.2f} rewards={rewards_str}")
+    
+    return total_score, rewards, success, error_msg
 
 
-def run(mock: bool) -> int:
-    env = CodingEnvironment()
-    results_path = "results.jsonl"
-
-    model_name = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile" if not mock else "mock-model")
-    groq_api_key = os.getenv("GROQ_API_KEY", "")
-
-    client: Any = None
+def run(mock: bool = False) -> int:
+    """Run all 15 scenarios and output results."""
+    
+    # Validate environment
     if not mock:
-        if not groq_api_key:
-            print("Missing required environment variable: GROQ_API_KEY", file=sys.stderr)
+        if OpenAI is None:
+            print("ERROR: openai package not installed. Run: pip install openai", file=sys.stderr)
             return 1
-
-        if Groq is None:
-            print("groq package is not available. Install requirements first.", file=sys.stderr)
+        if not HF_TOKEN:
+            print("ERROR: HF_TOKEN environment variable required", file=sys.stderr)
             return 1
-
-        client = Groq(api_key=groq_api_key)
-
-    scores_by_task: dict[str, list[float]] = defaultdict(list)
-
-    with open(results_path, "w", encoding="utf-8") as handle:
-        for task_id in TASKS:
-            for scenario_index in range(5):
-                obs = env.reset(task_id, scenario_index)
-                latency_ms = 0
-                total_score = 0.0
-                sub_scores: dict[str, float] = {}
-
-                try:
-                    if mock:
-                        action = _mock_action_for_task(task_id)
-                    else:
-                        action, latency_ms = _call_llm_for_action(
-                            client=client,
-                            model_name=model_name,
-                            task_id=task_id,
-                            obs=obs,
-                        )
-
-                    _, reward, _, _ = env.step(action)
-                    total_score = reward.total_score
-                    sub_scores = reward.sub_scores
-                except Exception as exc:
-                    print(
-                        (
-                            "[WARN] Failed episode "
-                            f"task={task_id} scenario={obs.scenario_id} "
-                            f"episode={obs.episode_id}: {exc}"
-                        ),
-                        file=sys.stderr,
-                    )
-
-                scores_by_task[task_id].append(total_score)
+    
+    # Initialize OpenAI client
+    llm_client = None
+    if not mock:
+        llm_client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+    
+    # Reset environment
+    print(f"Initializing OpenEnv at {OPENENV_URL}...")
+    try:
+        reset_result = call_openenv_reset(OPENENV_URL)
+        print(f"Reset complete: {reset_result.get('total_scenarios', 15)} scenarios loaded")
+    except Exception as e:
+        print(f"ERROR: Failed to reset environment: {e}", file=sys.stderr)
+        return 1
+    
+    # Track results
+    all_scores: dict[str, list[float]] = {"triage": [], "security": [], "dependency": []}
+    total_success = 0
+    total_episodes = 0
+    start_time = time.time()
+    
+    # Run all 15 scenarios
+    for task_type, scenario_ids in SCENARIOS.items():
+        for scenario_id in scenario_ids:
+            total_episodes += 1
+            print(f"\n{'='*60}")
+            print(f"Episode {total_episodes}/15: {scenario_id}")
+            print(f"{'='*60}")
+            
+            score, rewards, success, error = run_episode(
+                llm_client=llm_client,
+                task_type=task_type,
+                scenario_id=scenario_id,
+                mock=mock,
+            )
+            
+            all_scores[task_type].append(score)
+            if success:
+                total_success += 1
+    
+    # Print summary
+    elapsed = time.time() - start_time
+    print(f"\n{'='*60}")
+    print("FINAL SUMMARY")
+    print(f"{'='*60}")
+    print(f"Total episodes: {total_episodes}")
+    print(f"Successful: {total_success}")
+    print(f"Failed: {total_episodes - total_success}")
+    print(f"Runtime: {elapsed:.1f}s")
+    print()
+    print("Scores by task:")
+    print("-" * 40)
+    for task_type, scores in all_scores.items():
+        avg = sum(scores) / len(scores) if scores else 0.0
+        print(f"  {task_type:12s}: {avg:.2f} avg ({len(scores)} scenarios)")
+    
+    overall_avg = sum(sum(s) for s in all_scores.values()) / total_episodes if total_episodes else 0.0
+    print(f"\nOverall average: {overall_avg:.2f}")
+    
+    # Write results to file
+    with open("results.jsonl", "w") as f:
+        for task_type, scores in all_scores.items():
+            for i, score in enumerate(scores):
                 record = {
-                    "episode_id": obs.episode_id,
-                    "task_id": task_id,
-                    "scenario_id": obs.scenario_id,
-                    "model": model_name,
-                    "total_score": total_score,
-                    "sub_scores": sub_scores,
-                    "latency_ms": latency_ms,
+                    "task_type": task_type,
+                    "scenario_id": SCENARIOS[task_type][i],
+                    "score": score,
+                    "model": MODEL_NAME,
                 }
-                handle.write(json.dumps(record) + "\n")
-
-    _print_score_table(scores_by_task)
-    return 0
+                f.write(json.dumps(record) + "\n")
+    
+    print(f"\nResults saved to results.jsonl")
+    
+    return 0 if total_success == total_episodes else 1
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run coding environment evaluation")
+    """Entry point."""
+    parser = argparse.ArgumentParser(
+        description="CodeGuardian AI - Run OpenEnv evaluation across all 15 scenarios"
+    )
     parser.add_argument(
         "--mock",
         action="store_true",
-        help="Run with synthetic actions and skip external API calls.",
+        help="Run with mock actions (no LLM calls)",
     )
     args = parser.parse_args(argv)
     return run(mock=args.mock)
