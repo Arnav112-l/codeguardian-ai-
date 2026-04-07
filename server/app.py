@@ -69,6 +69,7 @@ async def health():
     return {"status": "ok"}
 
 @app.post("/reset")
+@app.get("/reset")
 async def reset():
     global _state
     _state = EnvState()

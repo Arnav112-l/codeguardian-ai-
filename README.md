@@ -25,10 +25,10 @@ Built for the META HACKATHON — grades agents across three tracks: Issue Triage
 pip install -r requirements.txt
 
 # Start the server
-uvicorn server.app:app --host 0.0.0.0 --port 8000
+uvicorn server.app:app --host 0.0.0.0 --port 7860
 
 # Verify
-curl http://localhost:8000/health
+curl http://localhost:7860/health
 # → {"status": "ok"}
 ```
 
@@ -36,7 +36,7 @@ curl http://localhost:8000/health
 
 ```bash
 docker build -t optimaintainer .
-docker run -p 8000:8000 optimaintainer
+docker run -p 7860:7860 optimaintainer
 ```
 
 ---
@@ -227,9 +227,21 @@ Meta/
 
 ```bash
 # Start server
-uvicorn server.app:app --host 0.0.0.0 --port 8000
+uvicorn server.app:app --host 0.0.0.0 --port 7860
 
 # In another terminal
 python test_audit.py
 # → 🏆 100% COMPLIANCE — READY FOR SUBMISSION
 ```
+
+---
+
+## Baseline Scores
+
+| Task | Avg Score | Scenarios |
+|------|-----------|-----------|
+| Triage | 0.38 | 5 |
+| Security Audit | 0.20 | 5 |
+| Dependency Update | 0.30 | 5 |
+
+*Scores generated with `python inference.py --mock` using random baseline agent.*

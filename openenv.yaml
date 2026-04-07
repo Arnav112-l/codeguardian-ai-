@@ -3,7 +3,7 @@ version: "1.0.0"
 description: "LLM coding agent evaluation environment"
 type: coding_env
 runtime: docker
-app_port: 8000
+app_port: 7860
 
 hardware: cpu-basic
 
